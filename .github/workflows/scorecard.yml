@@ -1,0 +1,100 @@
+# Daily NutCheck sweep: test every mint in scorecard.json, keep the reports on the `data`
+# branch, publish the scorecard to GitHub Pages, and fail loudly (GitHub emails you) when a
+# serious failure needs reporting to a mint operator before its details go public.
+name: Scorecard
+
+on:
+  schedule:
+    - cron: "17 5 * * *"   # 05:17 UTC daily (off the hour; GitHub delays top-of-hour runs)
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push reports to the data branch
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scorecard
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      alerts: ${{ steps.alerts.outputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install NutCheck
+        run: pip install .
+
+      - name: Check out report history (data branch)
+        run: |
+          git config --global user.name "nutcheck-bot"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data
+            git worktree add data FETCH_HEAD
+          else
+            git worktree add --orphan -b data data
+          fi
+
+      - name: Test every mint
+        run: nutcheck sweep scorecard.json
+
+      - name: Save reports
+        run: |
+          cd data
+          git add -A reports
+          if ! git diff --cached --quiet; then
+            git commit -q -m "Sweep $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push origin HEAD:data
+          fi
+
+      - name: Build site
+        run: nutcheck site scorecard.json -o _site --alerts alerts.txt
+
+      - id: alerts
+        name: Collect disclosure alerts
+        run: |
+          {
+            echo 'text<<NUTCHECK_EOF'
+            cat alerts.txt
+            echo 'NUTCHECK_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: sweep
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  alert:
+    needs: [sweep, deploy]
+    if: needs.sweep.outputs.alerts != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: A mint operator needs to be notified
+        env:
+          ALERTS: ${{ needs.sweep.outputs.alerts }}
+        run: |
+          echo "::error::Serious failure(s) found. Details are withheld from the site until the date below."
+          printf '%s\n' "$ALERTS"
+          echo
+          echo "Contact the operator privately (info page contact, or the implementation's security channel),"
+          echo "then add  \"notified\": \"<date>\"  to that mint in scorecard.json and push."
+          exit 1

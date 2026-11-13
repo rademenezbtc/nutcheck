@@ -1,0 +1,17 @@
+{
+  "title": "NutCheck",
+  "repo_url": "https://github.com/rademenezbtc/nutcheck",
+  "reports_dir": "reports",
+  "wallet_dir": "wallet",
+  "embargo_days": 14,
+  "mints": [
+    {"url": "http://127.0.0.1:3340", "name": "Acorn (honest)", "funded": true},
+    {"url": "http://127.0.0.1:3346", "name": "Almond (honest, free checks only)", "funded": false},
+    {"url": "http://127.0.0.1:3342", "name": "Chestnut (no_dleq)", "funded": true},
+    {"url": "http://127.0.0.1:3341", "name": "Walnut (keep_change)", "funded": true, "disclosed": true, "notified": "13 Nov"},
+    {"url": "http://127.0.0.1:3343", "name": "Macadamia (fee_lie)", "funded": true, "disclosed": true},
+    {"url": "http://127.0.0.1:3345", "name": "Pistachio (double_spend)", "funded": true, "disclosed": true},
+    {"url": "http://127.0.0.1:3344", "name": "Brazil (lock_bypass)", "funded": true, "notified": "13 Nov"},
+    {"url": "http://127.0.0.1:3349", "name": "Cashew (nothing listening)", "funded": false}
+  ]
+}

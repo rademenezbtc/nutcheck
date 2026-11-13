@@ -1,0 +1,19 @@
+{
+  "title": "NutCheck",
+  "repo_url": "https://github.com/rademenezbtc/nutcheck",
+  "reports_dir": "data/reports",
+  "wallet_dir": "/tmp/nutcheck-wallet",
+  "embargo_days": 14,
+  "mints": [
+    {"url": "https://testnut.cashu.space", "funded": true, "wait": 60},
+    {"url": "https://mint.minibits.cash/Bitcoin"},
+    {"url": "https://mint.macadamia.cash"},
+    {"url": "https://mint.coinos.io"},
+    {"url": "https://8333.space:3338"},
+    {"url": "https://mint.agorist.space"},
+    {"url": "https://mint.chorus.community"},
+    {"url": "https://mint.cubabitcoin.org"},
+    {"url": "https://mint.lnvoltz.com"},
+    {"url": "https://mint.westernbtc.com"}
+  ]
+}

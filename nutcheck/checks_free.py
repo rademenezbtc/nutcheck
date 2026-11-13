@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from . import crypto, secp
 from .client import MintClient, MintError
-from .model import Result, Severity as S, Status as St
+from .model import Result, Severity as S, Status as St, publishable_exchange
 from .wallet import Wallet
 
 KNOWN_NUT_ENDPOINTS = {
@@ -143,7 +143,7 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
             client.swap([forged], [o.wire() for o in outs])
             out.append(Result("swap.rejects_forgery", "Rejects forged ecash", "03", S.CRITICAL, St.FAIL,
                               "Mint signed new ecash in exchange for a proof with a made-up signature",
-                              evidence={"forged_input": forged}))
+                              evidence={"exchange": publishable_exchange(client.log[-1])}))
         except MintError as e:
             out.append(Result("swap.rejects_forgery", "Rejects forged ecash", "03", S.CRITICAL, St.PASS,
                               f"Forged proof refused ({e.code or e.status})"))

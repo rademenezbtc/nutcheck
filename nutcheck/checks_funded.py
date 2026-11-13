@@ -9,7 +9,7 @@ from hashlib import sha256
 from . import crypto
 from .checks_free import claimed
 from .client import MintClient, MintError
-from .model import Result, Severity as S, Status as St
+from .model import Result, Severity as S, Status as St, publishable_exchange
 from .secp import PrivateKey
 from .wallet import Output, Proof, Wallet
 
@@ -22,6 +22,9 @@ class Ctx:
         self.results: list[Result] = []
 
     def add(self, id, title, nut, sev, status, summary, **evidence):
+        if status in (St.FAIL, St.WARN) and self.client.log:
+            # the request that exposed the problem is the most recent one in every funded check
+            evidence["exchange"] = publishable_exchange(self.client.log[-1])
         self.results.append(Result(id, title, nut, sev, status, summary, funded=True, evidence=evidence))
 
     def try_swap(self, inputs: list[Proof], outputs: list[Output]):

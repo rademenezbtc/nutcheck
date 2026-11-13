@@ -8,3 +8,10 @@ run/*.json
 run/*.token
 run/*.txt
 *.egg-info/
+demo/reports/
+demo/wallet/
+demo/site/
+demo/*.log
+/data/
+/_site/
+/alerts.txt

@@ -39,6 +39,51 @@ Every "must refuse" test is paired with a "must accept" control built the same w
 
 **Grading:** the worst failure caps the grade. Critical → F, high → C, medium → B, low or a warning → A-.
 
+## Scorecard site
+
+Test a list of mints on a schedule and publish the results as a static site: a scorecard, a page per mint with the evidence behind every failure, badge SVGs and a JSON feed for wallets.
+
+```bash
+nutcheck sweep scorecard.json            # test every mint, save reports/<mint>/<timestamp>.json
+nutcheck site scorecard.json -o site/    # build the site from all saved reports
+```
+
+`scorecard.json`:
+
+```json
+{
+  "title": "NutCheck",
+  "embargo_days": 14,
+  "mints": [
+    {"url": "https://mint.example.com", "funded": false},
+    {"url": "https://other.example.com", "funded": true, "fund": 64, "notified": "13 Nov", "disclosed": false}
+  ]
+}
+```
+
+- **Responsible disclosure is built in.** A critical or high failure shows as a grade only, with details withheld from the pages, the JSON report, the feed and the badge (it reads "under review"), until `embargo_days` after it was first seen. Set `"disclosed": true` to publish early, for example once the operator has fixed it.
+- **Published evidence is safe.** Failed checks include the request and response that exposed them, with proofs, outputs, witnesses and preimages reduced to counts or redacted, so nothing in a report can be spent.
+- **Leftover ecash** from funded sweeps goes to `wallet/<mint>.tokens`, outside the published site. Keep that folder private.
+- Funded sweeps need a way to pay the funding invoice. Until the daemon has a Lightning wallet, use `"funded": false` for live mints, or pay the printed invoice by hand.
+
+### Hosting on GitHub (no server)
+
+`.github/workflows/scorecard.yml` runs the sweep daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes the site to GitHub Pages.
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+2. **Actions → Scorecard → Run workflow** for the first run (after that it runs daily).
+3. The site appears at `https://<user>.github.io/<repo>/`.
+4. Edit the mint list in `scorecard.json` and push.
+
+**When the run fails with "A mint operator needs to be notified",** NutCheck has found a critical or high failure. GitHub emails you about the failed run. The site shows only the grade until 14 days after the failure was first seen. Contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
+
+Notes:
+- Live mints run the free checks only (grades marked `*`) until NutCheck has a wallet to pay funding invoices. `testnut.cashu.space` is a test mint with fake Lightning, so it gets the full funded run for free.
+- GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count as activity. If the workflow ever shows as disabled, re-enable it in the Actions tab.
+- GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck. Rotating addresses is an open question in the brief.
+
+`demo/run_demo.sh` builds a demo scorecard from real runs: one naughty-proxy instance per fault mode, swept six times, with one mint that regresses halfway through and one still inside its disclosure window.
+
 ## Independence
 
 NutCheck's secp256k1, BDHKE, DLEQ, BIP-340 and keyset-ID code is its own pure-Python implementation of the NUT text. It does not reuse any mint's library. `tests/test_vectors.py` checks it against the official test vectors in `cashubtc/nuts`.
