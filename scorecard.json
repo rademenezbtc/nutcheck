@@ -5,15 +5,46 @@
   "wallet_dir": "/tmp/nutcheck-wallet",
   "embargo_days": 14,
   "mints": [
-    {"url": "https://testnut.cashu.space", "funded": true, "wait": 60},
-    {"url": "https://mint.minibits.cash/Bitcoin"},
-    {"url": "https://mint.macadamia.cash"},
-    {"url": "https://mint.coinos.io"},
-    {"url": "https://8333.space:3338"},
-    {"url": "https://mint.agorist.space"},
-    {"url": "https://mint.chorus.community"},
-    {"url": "https://mint.cubabitcoin.org"},
-    {"url": "https://mint.lnvoltz.com"},
-    {"url": "https://mint.westernbtc.com"}
+    {
+      "url": "https://testnut.cashu.space",
+      "funded": true,
+      "wait": 60
+    },
+    {
+      "url": "https://mint.minibits.cash/Bitcoin"
+    },
+    {
+      "url": "https://mint.macadamia.cash"
+    },
+    {
+      "url": "https://mint.coinos.io"
+    },
+    {
+      "url": "https://8333.space:3338"
+    },
+    {
+      "url": "https://mint.agorist.space"
+    },
+    {
+      "url": "https://mint.chorus.community"
+    },
+    {
+      "url": "https://mint.cubabitcoin.org"
+    },
+    {
+      "url": "https://mint.lnvoltz.com"
+    },
+    {
+      "url": "https://mint.westernbtc.com"
+    }
+  ],
+  "known_issues": [
+    {
+      "check": "p2pk.malformed",
+      "software": "cdk-mintd",
+      "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. The fix is in review upstream; mints pass once they run a CDK release that includes it.",
+      "url": "https://github.com/cashubtc/cdk/pull/2888",
+      "link_text": "CDK PR #2888"
+    }
   ]
 }

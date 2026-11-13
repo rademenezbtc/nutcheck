@@ -1,6 +1,6 @@
 # NutCheck — brief
 
-*"SSL Labs for Cashu mints." Rebuilt 13 Nov 2026: the original `claude/nutcheck-brief.md` never reached this project, so this version is reconstructed from the project summary and updated with the day-one spike results.*
+*"SSL Labs for Cashu mints." Rebuilt 13 Nov 2026: the original `claude/nutcheck-brief.md` never reached this project, so this version is reconstructed from the project summary and updated with the day-one spike results and the first live runs.*
 
 ## The gap
 
@@ -42,13 +42,23 @@ A reverse proxy in front of an honest FakeWallet mint that misbehaves on cue, so
 - Finding: Nutshell 0.21.0 answers an unbalanced swap with generic error code `11000`, not the spec's `11005`. That's minor, but a good case for a low-severity "error codes" check, and a polite first disclosure.
 - Installing Nutshell 0.21.0 needed three dependency overrides (`breez-sdk-spark`, `marshmallow<4`, `limits<4`), documented in the README.
 
+## First live runs (13 Nov)
+
+The scorecard is live at https://rademenezbtc.github.io/nutcheck/, rebuilt daily by a GitHub Actions workflow (free runners, report history on the `data` branch, GitHub Pages).
+
+- **10 mints tested:** 6 run Nutshell (0.17.0 to 0.22.1), 4 run CDK (0.17.6 to 0.18.3).
+- **9 live mints, free checks only:** all A* (keys, keyset IDs, forged ecash refused, HTTPS, honest info page).
+- **testnut.cashu.space, full funded run (cdk-mintd 0.18.1): B.** 26 of 27 checks pass, including DLEQ, double spend, overspend, every P2PK/HTLC lock and fee refunds. It accepts a P2PK secret with a duplicated `locktime` tag, which NUT-11 says MUST be rejected. CDK does this by design: current `master` keeps the first copy of a duplicated tag, and has a test asserting it, so it likely applies to every CDK mint. Already public in CDK's code, so no embargo; to raise openly with CDK and the spec authors.
+- **Lesson:** the first live run graded testnut F because NutCheck labelled this check critical ("anyone could take it"), although the spend carried a valid signature from the locking key. Reclassified as medium and the wrong report withdrawn from the history. Severity must describe the actual consequence of the specific spend, not the category of check.
+
 ## Plan to the 17 Nov show-and-tell
 
 | Day | Work |
 |---|---|
 | Fri 13 | ✅ Spike: CLI, checks, proxy, fault matrix |
-| Sat 14 | First live runs against 3–5 well-known mints (free checks first, then funded); run against **CDK `cdk-mintd`** as a second implementation; fix whatever reality breaks |
-| Sun 15 | Daemon + Nostr publishing (event kind and tags to decide, see open questions); static scorecard page |
+| Fri 13 | ✅ Static scorecard, daily GitHub workflow, first live runs (10 mints, CDK and Nutshell) |
+| Sat 14 | Funded checks on live mints via a Nostr Wallet Connect wallet (leftover sats paid back each run); raise the duplicate-tag issue with CDK |
+| Sun 15 | Signed Nostr publishing (event kind and tags to decide, see open questions) |
 | Mon 16 | Error-code check, `SIG_ALL` tests, keep testing after a `fee_lie` failure instead of stopping; rehearse the demo |
 | Tue 17 | Show-and-tell: honest mint → A, then flip proxy modes live and watch the grade fall with evidence |
 
@@ -74,8 +84,9 @@ About 11 sat per funded run per mint. 20 mints × daily runs ≈ 220 sat/day ≈
 
 ## Submission checklist
 
-- [ ] Repo public with README, licence (MIT) and the two test suites
+- [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
 - [ ] Recording of the proxy demo (honest → faults → honest)
-- [ ] At least 5 live mints graded, with any disclosures sent before results are public
-- [ ] Nostr events visible in a client; scorecard page live
+- [ ] At least 5 live mints graded with the funded checks, with any disclosures sent before results are public (10 graded on free checks so far)
+- [ ] Nostr events visible in a client
+- [x] Scorecard page live
 - [ ] This brief updated with what changed

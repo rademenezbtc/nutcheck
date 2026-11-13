@@ -96,3 +96,22 @@ def test_alert_until_operator_notified(tmp_path):
               "--alerts", str(alerts)])
     assert alerts.read_text() == ""
     assert ", reported to the operator" in (out / "index.html").read_text()
+
+
+def test_known_issue_note(tmp_path):
+    slug = _setup(tmp_path, disclosed=True)
+    cfg = json.loads((tmp_path / "scorecard.json").read_text())
+    cfg["known_issues"] = [{"check": "p2pk.basic", "software": "nutshell", "text": "Fixed upstream in X.",
+                            "url": "https://example.com/pr/1", "link_text": "PR #1"}]
+    (tmp_path / "scorecard.json").write_text(json.dumps(cfg))
+    out = _build(tmp_path, T0 + timedelta(days=7))
+    page = (out / "mints" / f"{slug}.html").read_text()
+    assert "Known issue in the mint software." in page and "https://example.com/pr/1" in page
+    assert "known upstream issue" in (out / "index.html").read_text()
+    feed = json.loads((out / "api" / "mints.json").read_text())["mints"][0]
+    assert feed["known_issues"][0]["url"] == "https://example.com/pr/1"
+    # no match for other software
+    cfg["known_issues"][0]["software"] = "cdk-mintd"
+    (tmp_path / "scorecard.json").write_text(json.dumps(cfg))
+    out = _build(tmp_path, T0 + timedelta(days=7))
+    assert "Known issue" not in (out / "mints" / f"{slug}.html").read_text()

@@ -48,6 +48,7 @@ FAIL_PHRASE = {
     "info.claims_answer": "Advertises features that don't work",
     "transport.https": "Served without HTTPS",
     "p2pk.refund": "Refund keys don't work after locktime",
+    "p2pk.malformed": "Accepts P2PK locks with duplicated tags",
 }
 BLURB = {
     "Keys": "Valid keys, one per amount, keyset IDs re-derive",
@@ -93,6 +94,15 @@ def phrase_for(r: dict) -> str:
 SEV_ORDER = ["critical", "high", "medium", "low", "info"]
 
 
+def known_issue(cfg: dict, report: dict, check_id: str) -> dict | None:
+    """A config entry explaining a failure that comes from the mint's software, e.g. a bug fixed upstream."""
+    version = (report.get("mint_info", {}).get("version") or "").lower()
+    for k in cfg.get("known_issues", []):
+        if k.get("check") == check_id and k.get("software", "").lower() in version:
+            return k
+    return None
+
+
 @dataclass
 class MintView:
     cfg: dict
@@ -103,6 +113,7 @@ class MintView:
     first_seen: datetime | None = None
     publish_on: datetime | None = None
     cats: dict = field(default_factory=dict)
+    site_cfg: dict = field(default_factory=dict)
 
     @property
     def name(self):
@@ -151,7 +162,8 @@ class MintView:
             return f"{self.software} · {self.fee}"
         fails = [r for r in self.fails if r["status"] == "fail"]
         if fails:
-            return phrase_for(fails[0])
+            known = known_issue(self.site_cfg, self.latest, fails[0]["id"])
+            return phrase_for(fails[0]) + (" · known upstream issue, fix pending" if known else "")
         warns = self.fails
         extra = f" · {warns[0]['summary'][:60]}" if warns else ""
         partial = " · free checks only" if self.latest.get("partial") else ""
@@ -167,7 +179,7 @@ def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list
         if not files:
             continue
         reports = [json.loads(f.read_text()) for f in files]
-        v = MintView(m, slug, reports, reports[-1])
+        v = MintView(m, slug, reports, reports[-1], site_cfg=cfg)
         latest_severe = {r["id"] for r in v.latest["results"] if r["status"] == "fail" and r["severity"] in SEVERE}
         if not v.latest.get("reachable", True):
             latest_severe = set()  # being offline is not a vulnerability to disclose
@@ -406,6 +418,14 @@ def _evidence_tiles(ev: dict) -> str:
     return f'<div class="ev">{tiles}</div>'
 
 
+def _known_box(k: dict | None) -> str:
+    if not k:
+        return ""
+    link = f' <a href="{escape(k["url"])}">{escape(k.get("link_text", "Upstream fix"))}</a>' if k.get("url") else ""
+    return (f'<div style="background:#EEF0FB;border:1px solid #CBD1F2;border-radius:10px;padding:12px 14px;font-size:14px;color:#22306E">'
+            f'<b>Known issue in the mint software.</b> {escape(k["text"])}{link}</div>')
+
+
 def _exchange(ev: dict) -> str:
     ex = ev.get("exchange")
     if not ex:
@@ -469,7 +489,7 @@ def render_mint(v: MintView, cfg: dict) -> str:
             blocks.append(f"""<div class="fail"><div class="frow"><span class="chip {'f' if r['status']=='fail' else 'w'}">{icon}</span>
 <h3>{escape(r['title'])}</h3><span class="tag small">NUT-{escape(r['nut'])}</span>
 <span class="sev" style="background:{sb};color:{sf}">{escape(r['severity'].capitalize())}{cap}</span></div>
-<p style="margin:0;color:#3F4450">{escape(r['summary'])}</p>{_evidence_tiles(r.get('evidence', {}))}{_exchange(r.get('evidence', {}))}</div>""")
+<p style="margin:0;color:#3F4450">{escape(r['summary'])}</p>{_known_box(known_issue(cfg, L, r['id']))}{_evidence_tiles(r.get('evidence', {}))}{_exchange(r.get('evidence', {}))}</div>""")
         n_fail = sum(1 for r in fails if r["status"] == "fail")
         n_warn = len(fails) - n_fail
         title = " · ".join(x for x in [f'Failed <span style="color:#A32A12">{n_fail}</span>' if n_fail else "",
@@ -570,6 +590,10 @@ def feed(views: list[MintView], base_url: str) -> dict:
         else:
             e["categories"] = {c: WORD[s] for c, s in v.cats.items()}
             e["failed"] = [r["id"] for r in v.latest["results"] if r["status"] == "fail"]
+            ki = [known_issue(v.site_cfg, v.latest, rid) for rid in e["failed"]]
+            if any(ki):
+                e["known_issues"] = [{"check": rid, "url": k.get("url"), "text": k["text"]}
+                                     for rid, k in zip(e["failed"], ki) if k]
             e["report"] = f"{base_url}reports/{v.slug}.json"
         out.append(e)
     return {"generator": "nutcheck", "mints": out}
