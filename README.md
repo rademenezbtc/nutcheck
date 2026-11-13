@@ -1,6 +1,8 @@
+<p><img src="assets/logo-lockup.svg" alt="NutCheck" width="320"></p>
+
 # NutCheck
 
-**SSL Labs for Cashu mints.** Point it at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it.
+**Get your nuts checked.** SSL Labs for Cashu mints. Point it at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it.
 
 NutCheck measures behaviour, not solvency. An A means the mint follows the rules today. It says nothing about whether the mint holds the bitcoin backing its ecash, or will still be there tomorrow.
 

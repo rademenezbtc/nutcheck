@@ -215,7 +215,16 @@ ICONS = {
     "s": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 7h6" fill="none" stroke="#8A8F99" stroke-width="2" stroke-linecap="round"/></svg>',
 }
 LOCK = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
-LOGO = '<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="#15171C"/><path d="M8 14.5l4 4 8-9" fill="none" stroke="#F6F6F3" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+LOGO = ('<svg width="36" height="36" viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-28 58 60)">'
+        '<circle cx="58" cy="36" r="24" fill="#C98A3E"/><circle cx="58" cy="78" r="28" fill="#C98A3E"/>'
+        '<path d="M37 52 Q58 62 79 52 L82 62 Q58 70 34 62 Z" fill="#C98A3E"/></g>'
+        '<circle cx="90" cy="88" r="27" fill="#FFFFFF"/><circle cx="90" cy="88" r="22" fill="#0E7A5A"/>'
+        '<path d="M79 88 L87 96 L102 79" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g transform="rotate(-28 58 60)">'
+           '<circle cx="58" cy="36" r="24" fill="#C98A3E"/><circle cx="58" cy="78" r="28" fill="#C98A3E"/>'
+           '<path d="M37 52 Q58 62 79 52 L82 62 Q58 70 34 62 Z" fill="#C98A3E"/></g>'
+           '<circle cx="90" cy="88" r="29" fill="#F6F6F3"/><circle cx="90" cy="88" r="24" fill="#0E7A5A"/>'
+           '<path d="M78 88 L87 97 L103 78" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>\n')
 WORD = {"p": "passed", "f": "failed", "w": "warning", "s": "not run"}
 
 CSS = """
@@ -315,6 +324,7 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(title)}</title>{FONTS}<link rel="stylesheet" href="{root}style.css">
+<link rel="icon" type="image/svg+xml" href="{root}favicon.svg">
 <link rel="alternate" type="application/json" href="{root}api/mints.json"></head>
 <body><header class="top"><div class="wrap">
 <a class="brand disp" href="{root}index.html">{LOGO}<span>{escape(cfg.get('title', 'NutCheck'))}</span></a>
@@ -619,6 +629,7 @@ def cmd_site(argv) -> int:
     for d in ("mints", "badge", "reports", "api"):
         (out / d).mkdir(parents=True)
     (out / "style.css").write_text(CSS)
+    (out / "favicon.svg").write_text(FAVICON)
     (out / "index.html").write_text(render_index(views, cfg))
     for v in views:
         (out / "mints" / f"{v.slug}.html").write_text(render_mint(v, cfg))
