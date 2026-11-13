@@ -1,0 +1,81 @@
+# NutCheck — brief
+
+*"SSL Labs for Cashu mints." Rebuilt 13 Nov 2026: the original `claude/nutcheck-brief.md` never reached this project, so this version is reconstructed from the project summary and updated with the day-one spike results.*
+
+## The gap
+
+Mint *availability* is already watched:
+
+- **The Cashu round-robin auditor** holds donated ecash, sends random Lightning payments between mints and marks mints that fail to pay. It rotates IP addresses so mints can't single it out.
+- **Sovran wallet** pulls uptime and success rates from that auditor and mixes in Nostr community ratings.
+- **cashumints.space** probes availability and response time and keeps a history of each mint's info page. Its docs don't mention DLEQ, fees or melt data.
+
+Nobody checks whether a live mint **follows the protocol**. NutCheck does: valid DLEQ proofs, keyset IDs matching keys, P2PK/HTLC locks actually enforced, double spends refused, payouts working, overpaid fees returned, and an info page that tells the truth. Each mint gets an A–F grade with evidence.
+
+**Honest limit:** NutCheck measures behaviour, not solvency. An A says the mint follows the rules today, not that it holds the sats backing its ecash.
+
+## Outputs
+
+1. **CLI** (`nutcheck <url>`). Anyone can point it at a mint, including operators testing their own before launch. *Working as of 13 Nov.*
+2. **Daemon.** Runs the suite on a schedule against a list of mints and publishes signed results as Nostr events, so wallets like Sovran can consume them.
+3. **Static scorecard.** A page listing each mint's grade, date of last test and per-check evidence.
+
+## Test catalogue
+
+**Free** (no ecash spent): HTTPS · info well formed and clock skew · keys are valid points · no key reused across amounts · keyset ID re-derivation (v1 and v2; v2 commits to `input_fee_ppk`, so a fee lie also breaks the ID) · active keyset exists · forged proof refused · claimed NUT endpoints answer.
+
+**Funded** (64 sat budget, about 11 sat actually spent per run at 100 ppk): paid quote issues full amount · quote can't be minted twice · DLEQ on mint, swap and melt change · overspend refused · advertised fee is the real fee · double spend and duplicate input refused · checkstate reports SPENT · P2PK (missing/wrong signature, 1-of-2 multisig, refund key before locktime, duplicate tag all refused; valid spends accepted; refund works after locktime) · HTLC (missing/wrong preimage, missing receiver signature refused) · melt pays · overpaid fees returned (melting against the mint's *own* invoice, where the true Lightning fee is 0, so every overpaid sat must come back).
+
+Every "must refuse" test has a "must accept" control built the same way, so a mint that refuses everything can't pass.
+
+**Grading:** the worst failure caps the grade. Critical (funds forged, stolen or lost) → F; high (privacy break, funds withheld) → C; medium → B; low or warning → A-. Runs without the funded half are marked *partial*.
+
+## Naughty proxy
+
+A reverse proxy in front of an honest FakeWallet mint that misbehaves on cue, so the demo needs no changes to CDK or Nutshell. Twelve modes: `bad_dleq`, `no_dleq`, `keyset_tamper`, `fee_lie`, `short_mint`, `quote_replay`, `overspend`, `double_spend`, `forgery`, `lock_bypass`, `keep_change`, `info_lie`. For the "accepts what it shouldn't" faults, the proxy mints the client's outputs from a fake-paid quote, so the client receives real signatures, exactly as from a broken mint. Modes switch live via `POST /__naughty`.
+
+## Day-one spike results (13 Nov)
+
+- CLI, crypto core, 27 checks and the proxy are built. **All 12 faults are caught. The honest mint grades A with no false alarms.** 22 automated tests pass, including the official NUT-00/02/12 and BIP-340 vectors.
+- Crypto is NutCheck's own pure-Python implementation of the spec text, so it doesn't share bugs with the mints it audits.
+- **Live mints were not reachable from the build workspace** (network allowlist). All testing so far is against local Nutshell 0.21.0 with FakeWallet. The first live runs must happen from a normal machine.
+- Finding: Nutshell 0.21.0 answers an unbalanced swap with generic error code `11000`, not the spec's `11005`. That's minor, but a good case for a low-severity "error codes" check, and a polite first disclosure.
+- Installing Nutshell 0.21.0 needed three dependency overrides (`breez-sdk-spark`, `marshmallow<4`, `limits<4`), documented in the README.
+
+## Plan to the 17 Nov show-and-tell
+
+| Day | Work |
+|---|---|
+| Fri 13 | ✅ Spike: CLI, checks, proxy, fault matrix |
+| Sat 14 | First live runs against 3–5 well-known mints (free checks first, then funded); run against **CDK `cdk-mintd`** as a second implementation; fix whatever reality breaks |
+| Sun 15 | Daemon + Nostr publishing (event kind and tags to decide, see open questions); static scorecard page |
+| Mon 16 | Error-code check, `SIG_ALL` tests, keep testing after a `fee_lie` failure instead of stopping; rehearse the demo |
+| Tue 17 | Show-and-tell: honest mint → A, then flip proxy modes live and watch the grade fall with evidence |
+
+**Demo script:** run against the honest mint (A) → `lock_bypass` (F, every lock check red) → `keep_change` (C, "23 sat kept by the mint") → `keyset_tamper` (F, ID mismatch plus DLEQ failures) → back to honest.
+
+## Open questions
+
+1. **Nostr format.** Reuse an existing mint-review kind (NIP-87 recommendations) with structured tags, or a dedicated kind with the full JSON report? What does Sovran already parse?
+2. **Fingerprinting.** Mints could spot NutCheck (deliberately invalid requests, fixed 64-sat budget) and behave well only for it. Copy the round-robin auditor's IP rotation? Randomise budget and test order?
+3. **External melts.** The fee-return test uses the mint's own invoice. Paying a *different* mint's invoice (like the auditor) tests real Lightning payouts, but the true routing fee is then unknown. Report change in relation to `fee_reserve` instead?
+4. **CDK vs Nutshell differences.** Which behaviours differ legitimately (error codes, empty outputs, rate limits), and how do we keep from punishing a mint for its implementation's choices?
+5. **Grading weights.** Is "missing DLEQ while claiming NUT-12" really a B? Should a stale clock affect the grade at all?
+
+## Ethics and responsible disclosure
+
+- Funded tests are ordinary wallet operations, and invalid requests are refused as normal. NutCheck never tries to overload a mint and keeps to a handful of requests per run (39 in the spike).
+- Before publishing a **critical or high** failure for a live mint, contact the operator privately (info-page contact, or the implementation's security channel if the bug is in CDK/Nutshell) and wait 14 days, or until it's fixed. Implementation-level bugs go upstream first, since they affect every mint running that software.
+- Results are signed, dated and carry evidence, so operators can reproduce them with the same CLI.
+
+## Costs
+
+About 11 sat per funded run per mint. 20 mints × daily runs ≈ 220 sat/day ≈ 6,600 sat/month. The original brief estimated about $5/month; the dollar figure depends on the BTC price. Hosting the daemon and a static page is close to free.
+
+## Submission checklist
+
+- [ ] Repo public with README, licence (MIT) and the two test suites
+- [ ] Recording of the proxy demo (honest → faults → honest)
+- [ ] At least 5 live mints graded, with any disclosures sent before results are public
+- [ ] Nostr events visible in a client; scorecard page live
+- [ ] This brief updated with what changed

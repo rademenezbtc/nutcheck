@@ -1,0 +1,10 @@
+.venv/
+.mintenv/
+__pycache__/
+.pytest_cache/
+run/*/
+run/*.log
+run/*.json
+run/*.token
+run/*.txt
+*.egg-info/

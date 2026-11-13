@@ -1,0 +1,21 @@
+[project]
+name = "nutcheck"
+version = "0.1.0"
+description = "SSL Labs for Cashu mints: grade whether a mint behaves as the NUTs require"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.25"]
+license = { file = "LICENSE" }
+
+[project.optional-dependencies]
+proxy = ["starlette", "uvicorn"]
+dev = ["pytest"]
+
+[project.scripts]
+nutcheck = "nutcheck.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["nutcheck"]
