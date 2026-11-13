@@ -29,7 +29,7 @@ concurrency:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     outputs:
       alerts: ${{ steps.alerts.outputs.text }}
     steps:

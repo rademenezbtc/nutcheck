@@ -66,7 +66,9 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
     try:
         q = client.mint_quote(budget, wallet.unit)
     except MintError as e:
-        ctx.add("mint.quote", "Mint quote issued", "04", S.HIGH, St.FAIL, f"Could not get a mint quote: {e}")
+        ctx.add("mint.quote", "Mint quote issued", "04", S.INFO, St.ERROR,
+                f"Run incomplete: the mint could not create a Lightning invoice ({e}). Its Lightning backend may be "
+                "down; that is an availability problem, which NutCheck does not grade. Funded checks were not run.")
         return ctx.results
     deadline = time.monotonic() + wait_s
     announced = False
@@ -323,7 +325,8 @@ def _melt(ctx: Ctx):
         mq = c.mint_quote(amount, w.unit)  # internal invoice: the mint pays itself, Lightning fee is 0
         melt_q = c.melt_quote(mq["request"], w.unit)
     except MintError as e:
-        ctx.add("melt.quote", "Melt quote issued", "05", S.HIGH, St.FAIL, f"Could not get a melt quote: {e}")
+        ctx.add("melt.quote", "Melt quote issued", "05", S.INFO, St.ERROR,
+                f"Run incomplete: the mint could not quote paying an invoice ({e}). Melt checks were not run.")
         return
     reserve = melt_q.get("fee_reserve", 0) or 0
     q_amount = melt_q["amount"]

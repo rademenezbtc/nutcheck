@@ -23,6 +23,7 @@ from .nwc import NWC, NWCError
 from .wallet import Proof, Wallet
 
 MIN_PAYBACK_SAT = 3
+RECOVER_NOW_SAT = 20  # smaller stashes are folded into that mint's next funded run instead
 _RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError)
 
 
@@ -80,6 +81,9 @@ class Funder:
                 if res is not None:
                     out.update(res)
                     self.paid_back += res["returned"]
+                if wallet.balance and self.stash_dir:
+                    self.stash(wallet, label)  # change too small to pay back: reused next run, not lost
+                    out["change_kept"] = wallet.balance
                 return out
             except _RETRYABLE as e:
                 last = e
@@ -137,6 +141,32 @@ class Funder:
         path.write_text(nostr.nip44_encrypt(self._key(), json.dumps(body)) + "\n")
         return path
 
+    def _open(self, path: Path):
+        body = json.loads(nostr.nip44_decrypt(self._key(), path.read_text().strip()))
+        wallet = Wallet(MintClient(body["mint"]), unit=body.get("unit", "sat"))
+        wallet.load_keysets()
+        proofs = [Proof(p["amount"], p["id"], p["secret"], p["C"]) for p in body["proofs"]]
+        states = wallet.client.checkstate([p.Y for p in proofs])
+        wallet.proofs = [p for p, st in zip(proofs, states) if st.get("state") == "UNSPENT"]
+        return body, wallet
+
+    def take_stash(self, mint_url: str) -> list[Proof]:
+        """Unspent stashed proofs for this mint, removed from the stash (the caller now holds them)."""
+        out = []
+        if not self.stash_dir or not self.stash_dir.exists():
+            return out
+        for path in sorted(self.stash_dir.glob("*.nutstash")):
+            try:
+                body = json.loads(nostr.nip44_decrypt(self._key(), path.read_text().strip()))
+                if body["mint"].rstrip("/") != mint_url.rstrip("/"):
+                    continue
+                _, wallet = self._open(path)
+            except Exception:  # noqa: BLE001  leave it for recover() to report
+                continue
+            out += wallet.proofs
+            path.unlink()
+        return out
+
     def recover(self) -> list[str]:
         """Pay back every stashed token. Returns human-readable lines; deletes stash files that are settled."""
         lines = []
@@ -148,12 +178,10 @@ class Funder:
             except Exception as e:  # noqa: BLE001  e.g. the wallet secret was rotated
                 lines.append(f"{path.name}: cannot decrypt ({e}); left in place")
                 continue
-            wallet = Wallet(MintClient(body["mint"]), unit=body.get("unit", "sat"))
+            if body.get("amount", 0) < RECOVER_NOW_SAT:
+                continue  # small change: folded into that mint's next funded run
             try:
-                wallet.load_keysets()
-                wallet.proofs = [Proof(p["amount"], p["id"], p["secret"], p["C"]) for p in body["proofs"]]
-                states = wallet.client.checkstate([p.Y for p in wallet.proofs])
-                wallet.proofs = [p for p, s in zip(wallet.proofs, states) if s.get("state") == "UNSPENT"]
+                body, wallet = self._open(path)
             except _RETRYABLE as e:
                 lines.append(f"{path.name}: mint not usable yet ({e}); will retry next run")
                 continue
@@ -161,7 +189,7 @@ class Funder:
                 path.unlink()
                 lines.append(f"{path.name}: nothing left to recover (already spent); removed")
                 continue
-            res = self.pay_back(wallet, path.stem, stash_on_failure=False)
+            res = self.pay_back(wallet, path.stem.split("-", 1)[0], stash_on_failure=False)
             if res["ok"]:
                 path.unlink()
                 lines.append(f"{path.name}: recovered {res['returned']} sat")

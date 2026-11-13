@@ -51,19 +51,25 @@ class MintClient:
     url: str
     timeout: float = 20.0
     log: list[Exchange] = field(default_factory=list)
-    min_interval: float = 0.2                       # pace requests so we look like a wallet, not a load test
-    backoff: tuple = (2, 5, 10, 20, 30)             # seconds to wait on successive 429s (or Retry-After)
+    # Pacing (plain class attributes so tests can speed them up)
+    min_interval = 0.2       # pace requests so we look like a wallet, not a load test
+    slow_interval = 3.3      # POST spacing once a mint limits us (~18/min, under Nutshell's default 20/min)
+    backoff = (65, 65, 65)   # waits after a 429. Nutshell's limiter uses elastic expiry: every request
+                             # sent while limited extends the lockout, so wait out a full quiet minute
+    gateway_backoff = (2, 5)  # waits after 502/503/504 on GETs
 
     def __post_init__(self):
         self.url = self.url.rstrip("/")
         self._http = httpx.Client(timeout=self.timeout, headers={"User-Agent": "Mozilla/5.0"})
         self._last = 0.0
-        self.rate_limited = 0                        # how many 429s we absorbed
+        self.rate_limited = 0      # how many 429s we absorbed
+        self.slow = False          # switched on by the first 429, or up front for mints known to limit hard
 
     _sleep = staticmethod(time.sleep)  # tests replace this to skip real waiting
 
     def _send(self, method, path, body):
-        wait = self.min_interval - (time.monotonic() - self._last)
+        interval = self.slow_interval if (self.slow and method == "POST") else self.min_interval
+        wait = interval - (time.monotonic() - self._last)
         if wait > 0:
             self._sleep(wait)
         self._last = time.monotonic()
@@ -82,11 +88,14 @@ class MintClient:
                     continue
                 raise
             ms = int((time.monotonic() - t0) * 1000)
-            if r.status_code in retryable and attempt < len(self.backoff):
-                self.rate_limited += r.status_code == 429
+            waits = self.backoff if r.status_code == 429 else self.gateway_backoff
+            if r.status_code in retryable and attempt < len(waits):
+                if r.status_code == 429:
+                    self.rate_limited += 1
+                    self.slow = True
                 ra = r.headers.get("retry-after", "")
-                delay = float(ra) if ra.replace(".", "", 1).isdigit() else self.backoff[attempt]
-                self._sleep(min(delay, 60))
+                hinted = float(ra) if ra.replace(".", "", 1).isdigit() else 0
+                self._sleep(min(max(hinted, waits[attempt]), 120))
                 attempt += 1
                 continue
             break

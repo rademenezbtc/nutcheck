@@ -40,7 +40,7 @@ def mint_slug(url: str) -> str:
     return s.lower()
 
 
-def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
+def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, preload=None):
     """Run every check against one mint. Returns (report dict, wallet holding leftover proofs)."""
     client = MintClient(url)
     wallet = Wallet(client)
@@ -51,6 +51,10 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
     try:
         free, info = checks_free.run(client, wallet)
         results += free
+        if "nutshell" in str(info.get("version", "")).lower():
+            client.slow = True  # Nutshell limits transactions to 20/min per IP by default
+        if preload and wallet.keysets:
+            wallet.proofs += preload  # change kept from an earlier run; paid back with this run's leftovers
         if not free_only and wallet.keysets:
             results += checks_funded.run(client, wallet, info, fund, wait, on_invoice)
     except Inconclusive as e:
@@ -62,7 +66,8 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
         results.append(Result("nutcheck.crash", "NutCheck completed", "-", Severity.INFO, Status.ERROR,
                               f"{type(e).__name__}: {e}", evidence={"trace": traceback.format_exc()[-2000:]}))
     g = grade(results)
-    funded_ran = any(r.funded and r.status in (Status.PASS, Status.FAIL) for r in results)
+    issued = any(r.id == "mint.issue" for r in results)  # ecash was actually minted from a paid quote
+    preloaded = sum(p.amount for p in (preload or []))
     reachable = not any(r.id == "info.wellformed" and r.summary.startswith("GET /v1/info failed") for r in results)
     report = {
         "nutcheck": __version__,
@@ -72,7 +77,7 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
         "duration_s": round(time.time() - started, 1),
         "reachable": reachable,
         **g,
-        "spent_sat": (fund - wallet.balance) if funded_ran else 0,
+        "spent_sat": (fund + preloaded - wallet.balance) if issued else 0,
         "requests": len(client.log),
         "rate_limited": client.rate_limited,
         "mint_info": {
@@ -197,11 +202,14 @@ def cmd_sweep(argv):
         else:
             use_nwc, free_only, pay = False, not mode, None
         on_invoice = pay or (lambda inv, amt, s=slug: print(f"  [{s}] invoice for {amt} sat not paid automatically", flush=True))
+        preload = funder.take_stash(m["url"]) if (funder and mode == "nwc") else []
+        paid_before = funder.paid_out if funder else 0
         report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
-                               on_invoice=on_invoice)
-        if use_nwc:
-            report["funding"] = {"source": "nwc", "funded": report["spent_sat"] > 0 or bool(wallet.proofs),
-                                 **funder.pay_back(wallet, slug)}
+                               on_invoice=on_invoice, preload=preload)
+        if funder and (use_nwc or wallet.proofs):
+            paid_in = funder.paid_out - paid_before
+            report["funding"] = {"source": "nwc", "paid_in": paid_in, "funded": paid_in > 0,
+                                 "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}
         path = save_report(report, reports_dir)
         save_leftover(wallet, wallet_dir / f"{slug}.tokens")
         fund_note = ""

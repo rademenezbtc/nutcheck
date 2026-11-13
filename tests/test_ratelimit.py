@@ -69,6 +69,27 @@ def test_hard_rate_limit_is_inconclusive_and_sats_are_stashed_then_recovered(tmp
         (tmp_path / "sc.json").write_text(json.dumps(cfg))
         n_invoices = len(w.invoices)
         cmd_sweep([str(tmp_path / "sc.json"), "--nwc", "--funding-alerts", str(alerts)])
-        assert list((tmp_path / "stash").glob("*.nutstash")) == []
+        left = list((tmp_path / "stash").glob("*.nutstash"))
+        assert stash[0] not in left, "the recovered stash file is removed"
+        assert len(left) <= 1, "at most the small change from the recovery melt is kept for next time"
         assert len(w.invoices) == n_invoices + 1, "recovery paid the stashed sats back to the wallet"
         assert alerts.read_text() == ""
+
+
+def test_small_change_is_carried_into_the_next_funded_run(tmp_path, monkeypatch):
+    with FakeRelayWallet(7712, proxy_url=PROXY, mint_url=MINT) as w:
+        monkeypatch.setenv("NWC_URL", w.uri)
+        cfg = {"reports_dir": "reports", "wallet_dir": "wallet", "stash_dir": "stash",
+               "mints": [{"url": PROXY, "funded": "nwc", "wait": 10}]}
+        (tmp_path / "sc.json").write_text(json.dumps(cfg))
+        _modes("await_payment")
+        cmd_sweep([str(tmp_path / "sc.json"), "--nwc"])
+        first = json.loads(sorted((tmp_path / "reports").rglob("*.json"))[-1].read_text())["funding"]
+        kept = first.get("change_kept", 0)
+        assert first["ok"] and first["dust"] == kept
+        if kept:
+            assert len(list((tmp_path / "stash").glob("*.nutstash"))) == 1
+        cmd_sweep([str(tmp_path / "sc.json"), "--nwc"])
+        second = json.loads(sorted((tmp_path / "reports").rglob("*.json"))[-1].read_text())["funding"]
+        assert second["carried_in"] == kept, "last run's change was reused, not lost"
+        assert second["ok"]
