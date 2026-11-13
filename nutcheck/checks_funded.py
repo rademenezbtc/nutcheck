@@ -234,8 +234,9 @@ def _locks(ctx: Ctx):
             w.proofs += w.unblind(sigs, outs)
         return err is None, err
 
-    def scenario(id, title, nut, reject_cases, accept_case, proof: Proof):
-        """reject_cases: list of (label, witness). accept_case: (label, witness) control that must succeed."""
+    def scenario(id, title, nut, reject_cases, accept_case, proof: Proof, leak_severity=S.CRITICAL, leak_summary=None):
+        """reject_cases: list of (label, witness). accept_case: (label, witness) control that must succeed.
+        leak_severity/leak_summary: what it means if a reject case is accepted (default: anyone could take it)."""
         leaked = []
         for label, wit in reject_cases:
             ok, _ = attempt(proof, wit)
@@ -243,11 +244,11 @@ def _locks(ctx: Ctx):
                 leaked.append(label)
                 break  # proof is gone
         if leaked:
-            ctx.add(id, title, nut, S.CRITICAL, St.FAIL,
-                    f"Locked ecash was spent with: {leaked[0]}. Anyone could have taken it.")
+            ctx.add(id, title, nut, leak_severity, St.FAIL,
+                    leak_summary or f"Locked ecash was spent with: {leaked[0]}. Anyone could have taken it.")
             return
         if accept_case is None:
-            ctx.add(id, title, nut, S.CRITICAL, St.PASS, f"Refused: {', '.join(l for l, _ in reject_cases)}")
+            ctx.add(id, title, nut, leak_severity, St.PASS, f"Refused: {', '.join(l for l, _ in reject_cases)}")
             return
         ok, err = attempt(proof, accept_case[1])
         if ok:
@@ -284,9 +285,15 @@ def _locks(ctx: Ctx):
                 else f"Refund key could not spend an expired lock: {err}. Senders cannot reclaim timed-out payments.")
 
         s = locked["malformed"].secret
+        # The spend carries a valid signature from the locking key, so accepting it is not theft. The risk is
+        # ambiguity: NUT-11 says duplicate tags make the secret unspendable, and implementations that pick
+        # different copies disagree on when the refund path opens.
         scenario("p2pk.malformed", "Malformed lock (duplicate tag) rejected", "11", [
             ("valid signature on a secret with two locktime tags", _witness([A.sign(s.encode())])),
-        ], None, locked["malformed"])
+        ], None, locked["malformed"], leak_severity=S.MEDIUM, leak_summary=(
+            "Accepted a P2PK secret with two locktime tags. NUT-11 says a duplicated tag makes the secret malformed "
+            "and it MUST be rejected. Wallets and mints that read different copies of the tag disagree on when the "
+            "refund key can spend, so a refund could open earlier than the receiver expects."))
 
     if htlc:
         scenario("htlc.hashlock", "HTLC hash lock enforced", "14", [
