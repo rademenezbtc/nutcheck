@@ -78,7 +78,9 @@ nutcheck site scorecard.json -o site/    # build the site from all saved reports
 **When the run fails with "A mint operator needs to be notified",** NutCheck has found a critical or high failure. GitHub emails you about the failed run. The site shows only the grade until 14 days after the failure was first seen. Contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
 
 Notes:
-- Live mints run the free checks only (grades marked `*`) until NutCheck has a wallet to pay funding invoices. `testnut.cashu.space` is a test mint with fake Lightning, so it gets the full funded run for free.
+- **Funded checks on live mints** use a Nostr Wallet Connect wallet. Store its send-and-receive connection string as the repository secret `NWC_URL`; only the sweep step can read it, and it never appears in logs or reports. Mints marked `"funded": "nwc"` are funded on Mondays, or whenever you start the workflow by hand with **funded** ticked (optionally for one mint via **only**). For each mint NutCheck pays the 64-sat funding invoice, runs the funded checks, then pays every leftover sat back to the same wallet. Expect roughly 15 sat per mint per funded run.
+- **Funding safety:** at most `nwc_max_sat_per_run` sats (default 1000) are paid out per run; after any failed pay-back or wallet error no further mint is funded in that run, and the workflow fails so you are emailed. Give NutCheck a wallet (or vault) that only holds what you are willing to spend.
+- `testnut.cashu.space` is a test mint with fake Lightning, so it gets the full funded run every day for free.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count as activity. If the workflow ever shows as disabled, re-enable it in the Actions tab.
 - GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck. Rotating addresses is an open question in the brief.
 

@@ -7,6 +7,15 @@ on:
   schedule:
     - cron: "17 5 * * *"   # 05:17 UTC daily (off the hour; GitHub delays top-of-hour runs)
   workflow_dispatch:
+    inputs:
+      funded:
+        description: 'Fund the "nwc" mints from the NWC wallet now (scheduled runs do this on Mondays)'
+        type: boolean
+        default: false
+      only:
+        description: "Test only this mint, by slug (e.g. mint.minibits.cash_bitcoin). Empty = all"
+        type: string
+        default: ""
 
 permissions:
   contents: write   # push reports to the data branch
@@ -31,7 +40,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install NutCheck
-        run: pip install .
+        run: pip install ".[nwc]"
 
       - name: Check out report history (data branch)
         run: |
@@ -45,7 +54,22 @@ jobs:
           fi
 
       - name: Test every mint
-        run: nutcheck sweep scorecard.json
+        env:
+          NWC_URL: ${{ secrets.NWC_URL }}   # only this step can see the wallet connection
+          FUNDED_INPUT: ${{ inputs.funded }}
+          ONLY: ${{ inputs.only }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          args=()
+          if [ "$FUNDED_INPUT" = "true" ] || { [ "$EVENT" = "schedule" ] && [ "$(date -u +%u)" = "1" ]; }; then
+            if [ -n "$NWC_URL" ]; then
+              args+=(--nwc --funding-alerts funding-alerts.txt)
+            else
+              echo "::warning::NWC_URL secret is not set; funded checks skipped"
+            fi
+          fi
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          nutcheck sweep scorecard.json "${args[@]}"
 
       - name: Save reports
         run: |
@@ -64,7 +88,7 @@ jobs:
         run: |
           {
             echo 'text<<NUTCHECK_EOF'
-            cat alerts.txt
+            cat alerts.txt funding-alerts.txt 2>/dev/null
             echo 'NUTCHECK_EOF'
           } >> "$GITHUB_OUTPUT"
 
@@ -88,13 +112,14 @@ jobs:
     if: needs.sweep.outputs.alerts != ''
     runs-on: ubuntu-latest
     steps:
-      - name: A mint operator needs to be notified
+      - name: NutCheck needs your attention
         env:
           ALERTS: ${{ needs.sweep.outputs.alerts }}
         run: |
-          echo "::error::Serious failure(s) found. Details are withheld from the site until the date below."
+          echo "::error::NutCheck found something that needs a person:"
           printf '%s\n' "$ALERTS"
           echo
-          echo "Contact the operator privately (info page contact, or the implementation's security channel),"
-          echo "then add  \"notified\": \"<date>\"  to that mint in scorecard.json and push."
+          echo "Serious mint failure: details are withheld from the site until the date shown. Contact the operator"
+          echo "privately, then add  \"notified\": \"<date>\"  to that mint in scorecard.json and push."
+          echo "Funding problem: no further mints were funded in this run. Check the NWC wallet's balance and history."
           exit 1

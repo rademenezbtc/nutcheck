@@ -38,9 +38,10 @@ MODES = {
     "lock_bypass": "ignore P2PK/HTLC spending conditions",
     "keep_change": "pay the invoice but keep the overpaid fee change",
     "info_lie": "claim NUT-07 checkstate but answer 404",
+    "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
 }
 
-state = {"modes": set()}
+state = {"modes": set(), "paid": set()}
 upstream: httpx.AsyncClient
 
 
@@ -101,6 +102,10 @@ async def handle(request: Request):
             state["modes"] = modes
         return JSONResponse({"modes": sorted(state["modes"]), "available": MODES})
 
+    if path == "/__paid":
+        state["paid"].add(req_json["invoice"])
+        return JSONResponse({"ok": True})
+
     if on("info_lie") and path == "/v1/checkstate":
         return JSONResponse({"detail": "Not Found"}, 404)
 
@@ -120,6 +125,9 @@ async def handle(request: Request):
                 ks["input_fee_ppk"] = 0
             if on("keyset_tamper") and "keys" in ks and "1" in ks["keys"]:
                 ks["keys"]["1"] = await substitute_key()
+    if on("await_payment") and path.startswith("/v1/mint/quote/bolt11") and status == 200 \
+            and data.get("request") not in state["paid"]:
+        data["state"], data["paid"] = "UNPAID", False
     if path == "/v1/info" and on("info_lie"):
         data["nuts"]["7"] = {"supported": True}
 

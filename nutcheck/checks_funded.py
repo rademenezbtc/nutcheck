@@ -75,7 +75,12 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
         if st.get("state") in ("PAID", "ISSUED") or st.get("paid") is True:
             break
         if not announced:
-            on_invoice(q["request"], budget)
+            try:
+                on_invoice(q["request"], budget)
+            except Exception as e:  # noqa: BLE001  funding problems are not the mint's fault
+                ctx.add("mint.funded", "Funding invoice paid", "04", S.INFO, St.SKIP,
+                        f"Could not fund this run ({e}); funded checks skipped")
+                return ctx.results
             announced = True
         if time.monotonic() > deadline:
             ctx.add("mint.funded", "Funding invoice paid", "04", S.INFO, St.SKIP,

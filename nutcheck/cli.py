@@ -154,24 +154,55 @@ def load_config(path: str) -> tuple[dict, Path]:
 
 
 def cmd_sweep(argv):
+    import os
     ap = argparse.ArgumentParser(prog="nutcheck sweep", description="Test every mint in a scorecard config.")
     ap.add_argument("config")
     ap.add_argument("--only", metavar="SLUG", action="append", help="test only these mints")
+    ap.add_argument("--nwc", action="store_true",
+                    help='fund mints marked "funded": "nwc" from the wallet in the NWC_URL environment variable')
+    ap.add_argument("--funding-alerts", metavar="FILE", help="write funding problems here (one per line)")
     a = ap.parse_args(argv)
     cfg, base = load_config(a.config)
     reports_dir = base / cfg.get("reports_dir", "reports")
     wallet_dir = base / cfg.get("wallet_dir", "wallet")
+    funder = None
+    if a.nwc:
+        from .funding import Funder
+        from .nwc import NWC
+        uri = os.environ.get("NWC_URL", "")
+        if not uri:
+            print("--nwc given but NWC_URL is not set", file=sys.stderr)
+            return 2
+        funder = Funder(NWC(uri), int(cfg.get("nwc_max_sat_per_run", 1000)))
     for m in cfg["mints"]:
         slug = mint_slug(m["url"])
         if a.only and slug not in a.only:
             continue
-        funded = m.get("funded", False)
-        report, wallet = audit(m["url"], free_only=not funded, fund=m.get("fund", 64),
-                               wait=m.get("wait", 30),
-                               on_invoice=lambda inv, amt: print(f"  [{slug}] pay {amt} sat: {inv}", flush=True))
+        mode = m.get("funded", False)
+        if mode == "nwc":
+            use_nwc = funder is not None and not funder.stopped
+            free_only = not use_nwc
+            pay = funder.pay if use_nwc else None
+        else:
+            use_nwc, free_only, pay = False, not mode, None
+        on_invoice = pay or (lambda inv, amt, s=slug: print(f"  [{s}] invoice for {amt} sat not paid automatically", flush=True))
+        report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
+                               on_invoice=on_invoice)
+        if use_nwc:
+            report["funding"] = {"source": "nwc", "funded": report["spent_sat"] > 0 or bool(wallet.proofs),
+                                 **funder.pay_back(wallet, slug)}
         path = save_report(report, reports_dir)
         save_leftover(wallet, wallet_dir / f"{slug}.tokens")
-        print(f"{report['grade']:<3} {slug:<40} {'partial ' if report['partial'] else ''}→ {path}")
+        fund_note = ""
+        if report.get("funding"):
+            f = report["funding"]
+            fund_note = f" [nwc: returned {f['returned']} of {f['leftover']} sat{'' if f['ok'] else ', PAY-BACK FAILED'}]"
+        print(f"{report['grade']:<3} {slug:<40} {'partial ' if report['partial'] else ''}→ {path}{fund_note}")
+    if funder:
+        print(f"NWC: paid out {funder.paid_out} sat, paid back {funder.paid_back} sat"
+              + (f"; funding stopped: {funder.stopped}" if funder.stopped else ""))
+        if a.funding_alerts:
+            Path(a.funding_alerts).write_text("".join(f"Funding: {x}\n" for x in funder.alerts))
     return 0
 
 

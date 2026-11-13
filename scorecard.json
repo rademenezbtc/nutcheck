@@ -11,31 +11,40 @@
       "wait": 60
     },
     {
-      "url": "https://mint.minibits.cash/Bitcoin"
+      "url": "https://mint.minibits.cash/Bitcoin",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.macadamia.cash"
+      "url": "https://mint.macadamia.cash",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.coinos.io"
+      "url": "https://mint.coinos.io",
+      "funded": "nwc"
     },
     {
-      "url": "https://8333.space:3338"
+      "url": "https://8333.space:3338",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.agorist.space"
+      "url": "https://mint.agorist.space",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.chorus.community"
+      "url": "https://mint.chorus.community",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.cubabitcoin.org"
+      "url": "https://mint.cubabitcoin.org",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.lnvoltz.com"
+      "url": "https://mint.lnvoltz.com",
+      "funded": "nwc"
     },
     {
-      "url": "https://mint.westernbtc.com"
+      "url": "https://mint.westernbtc.com",
+      "funded": "nwc"
     }
   ],
   "known_issues": [
@@ -46,5 +55,6 @@
       "url": "https://github.com/cashubtc/cdk/pull/2888",
       "link_text": "CDK PR #2888"
     }
-  ]
+  ],
+  "nwc_max_sat_per_run": 1000
 }
