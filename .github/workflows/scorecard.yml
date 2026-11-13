@@ -75,6 +75,7 @@ jobs:
         run: |
           cd data
           git add -A reports
+          if [ -d stash ] || git ls-files --error-unmatch stash >/dev/null 2>&1; then git add -A stash; fi
           if ! git diff --cached --quiet; then
             git commit -q -m "Sweep $(date -u +%Y-%m-%dT%H:%MZ)"
             git push origin HEAD:data

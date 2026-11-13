@@ -2,18 +2,28 @@
 
 Safety rules:
 - a hard cap on sats paid out per sweep (`nwc_max_sat_per_run`, default 1000);
+- a pay-back is retried; if it still fails, the leftover ecash is stashed, encrypted with a key derived
+  from the NWC secret, so it is never lost with the CI runner. The next funded sweep pays it back first;
 - after any failed pay-back or wallet error, no further mint is funded in that sweep;
 - every problem becomes a funding alert, which fails the workflow so the owner is emailed.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
-from .client import MintError
+from . import nostr
+from .client import Inconclusive, MintClient, MintError
 from .nwc import NWC, NWCError
-from .wallet import Wallet
+from .wallet import Proof, Wallet
 
 MIN_PAYBACK_SAT = 3
+_RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError)
 
 
 class FundingStopped(Exception):
@@ -21,9 +31,14 @@ class FundingStopped(Exception):
 
 
 class Funder:
-    def __init__(self, nwc: NWC, max_sat_per_run: int = 1000):
+    _sleep = staticmethod(time.sleep)  # tests replace this to skip real waiting
+
+    def __init__(self, nwc: NWC, max_sat_per_run: int = 1000, stash_dir: Path | None = None,
+                 retry_waits: tuple = (30, 60)):
         self.nwc = nwc
         self.max = max_sat_per_run
+        self.stash_dir = Path(stash_dir) if stash_dir else None
+        self.retry_waits = retry_waits
         self.paid_out = 0
         self.paid_back = 0
         self.stopped: str | None = None
@@ -33,6 +48,8 @@ class Funder:
         if not self.stopped:
             self.stopped = reason
         self.alerts.append(reason)
+
+    # ---- paying in --------------------------------------------------------------------------------
 
     def pay(self, invoice: str, amount: int):
         """Used as the funded checks' on_invoice callback."""
@@ -47,52 +64,107 @@ class Funder:
             raise FundingStopped(str(e)) from None
         self.paid_out += amount + (res.get("fees_paid") or 0) // 1000
 
-    def pay_back(self, wallet: Wallet, label: str) -> dict:
-        """Melt all leftover ecash to an invoice from the funding wallet."""
-        bal = wallet.balance
-        out = {"leftover": bal, "returned": 0, "melt_fee": 0, "dust": bal, "ok": True}
-        if bal < MIN_PAYBACK_SAT:
+    # ---- paying back ------------------------------------------------------------------------------
+
+    def pay_back(self, wallet: Wallet, label: str, stash_on_failure: bool = True) -> dict:
+        """Melt all leftover ecash to an invoice from the funding wallet, retrying before giving up."""
+        out = {"leftover": wallet.balance, "returned": 0, "melt_fee": 0, "dust": wallet.balance, "ok": True}
+        if wallet.balance < MIN_PAYBACK_SAT:
             return out
+        last = None
+        for attempt in range(len(self.retry_waits) + 1):
+            if attempt:
+                self._sleep(self.retry_waits[attempt - 1])
+            try:
+                res = self._melt_back(wallet, label)
+                if res is not None:
+                    out.update(res)
+                    self.paid_back += res["returned"]
+                return out
+            except _RETRYABLE as e:
+                last = e
+        out["ok"] = False
+        why = f"{label}: pay-back failed after {len(self.retry_waits) + 1} attempts ({last})"
+        if stash_on_failure and self.stash_dir:
+            path = self.stash(wallet, label)
+            out["stashed"] = True
+            why += f"; {wallet.balance} sat stashed encrypted in {path.name}, the next funded run pays it back"
+        else:
+            why += f"; {wallet.balance} sat left as ecash on the mint"
+        self.stop(why)
+        return out
+
+    def _melt_back(self, wallet: Wallet, label: str) -> dict | None:
         c = wallet.client
         proofs = list(wallet.proofs)
+        bal = sum(p.amount for p in proofs)
         in_fee = wallet.fee(proofs)
         target = bal - in_fee - max(2, bal // 50)
         for _ in range(4):
             if target < MIN_PAYBACK_SAT:
-                break
-            try:
-                invoice = self.nwc.make_invoice(target, f"NutCheck leftover from {label}")
-                q = c.melt_quote(invoice, wallet.unit)
-            except (NWCError, MintError, OSError, TimeoutError, ConnectionError) as e:
-                return self._failed(out, label, f"could not prepare pay-back: {e}")
+                return None  # too little to be worth paying back
+            invoice = self.nwc.make_invoice(target, f"NutCheck leftover from {label}")
+            q = c.melt_quote(invoice, wallet.unit)
             need = q["amount"] + (q.get("fee_reserve") or 0) + in_fee
             if need > bal:
                 target -= need - bal
                 continue
             blanks = wallet.outputs([1] * max((bal - q["amount"] - in_fee).bit_length(), 1))
-            try:
-                res = c.melt(q["quote"], [p.wire() for p in proofs], [o.wire() for o in blanks])
-            except MintError as e:
-                return self._failed(out, label, f"mint refused the pay-back melt: {e}")
+            res = c.melt(q["quote"], [p.wire() for p in proofs], [o.wire() for o in blanks])
             state = res.get("state") or ("PAID" if res.get("paid") else "UNPAID")
             deadline = time.monotonic() + 60
             while state == "PENDING" and time.monotonic() < deadline:
                 time.sleep(3)
-                try:
-                    res = c.get(f"/v1/melt/quote/bolt11/{q['quote']}")
-                    state = res.get("state", state)
-                except MintError:
-                    pass
+                res = c.get(f"/v1/melt/quote/bolt11/{q['quote']}")
+                state = res.get("state", state)
             if state != "PAID":
-                return self._failed(out, label, f"pay-back melt ended {state}")
-            change = wallet.unblind(res.get("change") or [], blanks)
-            wallet.proofs = change
-            out.update(returned=q["amount"], melt_fee=bal - q["amount"] - wallet.balance, dust=wallet.balance)
-            self.paid_back += q["amount"]
-            return out
-        return out  # too little to be worth paying back
+                raise MintError(200, {"detail": f"pay-back melt ended {state}"})
+            wallet.proofs = wallet.unblind(res.get("change") or [], blanks)
+            return {"returned": q["amount"], "melt_fee": bal - q["amount"] - wallet.balance, "dust": wallet.balance}
+        return None
 
-    def _failed(self, out: dict, label: str, why: str) -> dict:
-        self.stop(f"{label}: {why} ({out['leftover']} sat left on the mint as ecash)")
-        out["ok"] = False
-        return out
+    # ---- the stash: leftover ecash that could not be paid back yet ---------------------------------
+
+    def _key(self) -> bytes:
+        return hmac.new(b"nutcheck-stash-v1", self.nwc._secret.to_bytes(32, "big"), hashlib.sha256).digest()
+
+    def stash(self, wallet: Wallet, label: str) -> Path:
+        self.stash_dir.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(timezone.utc)
+        body = {"mint": wallet.client.url, "unit": wallet.unit, "created": now.isoformat(timespec="seconds"),
+                "amount": wallet.balance, "proofs": [p.wire() for p in wallet.proofs]}
+        path = self.stash_dir / f"{label}-{now.strftime('%Y%m%dT%H%M%SZ')}.nutstash"
+        path.write_text(nostr.nip44_encrypt(self._key(), json.dumps(body)) + "\n")
+        return path
+
+    def recover(self) -> list[str]:
+        """Pay back every stashed token. Returns human-readable lines; deletes stash files that are settled."""
+        lines = []
+        if not self.stash_dir or not self.stash_dir.exists():
+            return lines
+        for path in sorted(self.stash_dir.glob("*.nutstash")):
+            try:
+                body = json.loads(nostr.nip44_decrypt(self._key(), path.read_text().strip()))
+            except Exception as e:  # noqa: BLE001  e.g. the wallet secret was rotated
+                lines.append(f"{path.name}: cannot decrypt ({e}); left in place")
+                continue
+            wallet = Wallet(MintClient(body["mint"]), unit=body.get("unit", "sat"))
+            try:
+                wallet.load_keysets()
+                wallet.proofs = [Proof(p["amount"], p["id"], p["secret"], p["C"]) for p in body["proofs"]]
+                states = wallet.client.checkstate([p.Y for p in wallet.proofs])
+                wallet.proofs = [p for p, s in zip(wallet.proofs, states) if s.get("state") == "UNSPENT"]
+            except _RETRYABLE as e:
+                lines.append(f"{path.name}: mint not usable yet ({e}); will retry next run")
+                continue
+            if not wallet.proofs:
+                path.unlink()
+                lines.append(f"{path.name}: nothing left to recover (already spent); removed")
+                continue
+            res = self.pay_back(wallet, path.stem, stash_on_failure=False)
+            if res["ok"]:
+                path.unlink()
+                lines.append(f"{path.name}: recovered {res['returned']} sat")
+            else:
+                lines.append(f"{path.name}: still failing; will retry next run")
+        return lines

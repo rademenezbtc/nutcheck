@@ -18,6 +18,21 @@ class Exchange:
     ms: int
 
 
+class Inconclusive(Exception):
+    """The mint did not give a usable answer (rate limited, overloaded, gateway error).
+
+    Deliberately NOT a MintError: checks treat a MintError as "the mint refused", so a rate-limit
+    reply must never be mistaken for a refusal (a false pass) or for misbehaviour (a false fail)."""
+
+
+class RateLimited(Inconclusive):
+    pass
+
+
+class MintUnavailable(Inconclusive):
+    pass
+
+
 class MintError(Exception):
     def __init__(self, status: int, body):
         self.status = status
@@ -36,20 +51,54 @@ class MintClient:
     url: str
     timeout: float = 20.0
     log: list[Exchange] = field(default_factory=list)
+    min_interval: float = 0.2                       # pace requests so we look like a wallet, not a load test
+    backoff: tuple = (2, 5, 10, 20, 30)             # seconds to wait on successive 429s (or Retry-After)
 
     def __post_init__(self):
         self.url = self.url.rstrip("/")
         self._http = httpx.Client(timeout=self.timeout, headers={"User-Agent": "Mozilla/5.0"})
+        self._last = 0.0
+        self.rate_limited = 0                        # how many 429s we absorbed
+
+    _sleep = staticmethod(time.sleep)  # tests replace this to skip real waiting
+
+    def _send(self, method, path, body):
+        wait = self.min_interval - (time.monotonic() - self._last)
+        if wait > 0:
+            self._sleep(wait)
+        self._last = time.monotonic()
+        return self._http.request(method, self.url + path, json=body)
 
     def _call(self, method: str, path: str, body=None):
-        t0 = time.monotonic()
-        r = self._http.request(method, self.url + path, json=body)
-        ms = int((time.monotonic() - t0) * 1000)
+        retryable = {429} | ({502, 503, 504} if method == "GET" else set())
+        attempt = 0
+        while True:
+            t0 = time.monotonic()
+            try:
+                r = self._send(method, path, body)
+            except httpx.TimeoutException:
+                if method == "GET" and attempt < 1:
+                    attempt += 1
+                    continue
+                raise
+            ms = int((time.monotonic() - t0) * 1000)
+            if r.status_code in retryable and attempt < len(self.backoff):
+                self.rate_limited += r.status_code == 429
+                ra = r.headers.get("retry-after", "")
+                delay = float(ra) if ra.replace(".", "", 1).isdigit() else self.backoff[attempt]
+                self._sleep(min(delay, 60))
+                attempt += 1
+                continue
+            break
         try:
             data = r.json()
         except json.JSONDecodeError:
-            data = r.text[:500]
+            data = r.text[:300]
         self.log.append(Exchange(method, path, r.status_code, body, data, ms))
+        if r.status_code == 429:
+            raise RateLimited(f"{method} {path}: still rate limited (HTTP 429) after backing off")
+        if r.status_code >= 500:
+            raise MintUnavailable(f"{method} {path}: HTTP {r.status_code}")
         if r.status_code >= 400:
             raise MintError(r.status_code, data)
         return data

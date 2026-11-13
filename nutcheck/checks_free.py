@@ -5,7 +5,7 @@ import time
 from urllib.parse import urlparse
 
 from . import crypto, secp
-from .client import MintClient, MintError
+from .client import Inconclusive, MintClient, MintError
 from .model import Result, Severity as S, Status as St, publishable_exchange
 from .wallet import Wallet
 
@@ -63,6 +63,8 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
             evidence={"name": info.get("name"), "version": info.get("version"), "clock_skew_s": skew,
                       "nuts": sorted(info.get("nuts", {}), key=lambda x: int(x) if x.isdigit() else 999)},
         ))
+    except Inconclusive:
+        raise
     except Exception as e:  # noqa: BLE001
         out.append(Result("info.wellformed", "Info endpoint is well formed", "06", S.HIGH, St.FAIL,
                           f"GET /v1/info failed: {e}"))
@@ -71,6 +73,8 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
     # -- NUT-01/02 keys ----------------------------------------------------------
     try:
         wallet.load_keysets()
+    except Inconclusive:
+        raise
     except Exception as e:  # noqa: BLE001
         out.append(Result("keys.load", "Keys and keysets load", "01", S.CRITICAL, St.FAIL, str(e)))
         return out, info
@@ -158,6 +162,8 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
         except MintError as e:
             if e.status in (404, 405, 501):
                 dead.append(f"NUT-{nut} ({path} → {e.status})")
+        except Inconclusive:
+            raise
         except Exception as e:  # noqa: BLE001
             dead.append(f"NUT-{nut} ({path} → {e})")
     if claimed(info, "7"):
@@ -165,6 +171,8 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
             st = client.checkstate([secp.encode_hex(crypto.hash_to_curve(crypto.random_secret().encode()))])
             if not st or st[0].get("state") != "UNSPENT":
                 dead.append(f"NUT-07 reports {st} for a never-seen secret (expected UNSPENT)")
+        except Inconclusive:
+            raise
         except Exception:  # noqa: BLE001
             pass
     out.append(Result(

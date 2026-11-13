@@ -8,7 +8,7 @@ from hashlib import sha256
 
 from . import crypto
 from .checks_free import claimed
-from .client import MintClient, MintError
+from .client import Inconclusive, MintClient, MintError
 from .model import Result, Severity as S, Status as St, publishable_exchange
 from .secp import PrivateKey
 from .wallet import Output, Proof, Wallet
@@ -77,6 +77,8 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
         if not announced:
             try:
                 on_invoice(q["request"], budget)
+            except Inconclusive:
+                raise
             except Exception as e:  # noqa: BLE001  funding problems are not the mint's fault
                 ctx.add("mint.funded", "Funding invoice paid", "04", S.INFO, St.SKIP,
                         f"Could not fund this run ({e}); funded checks skipped")

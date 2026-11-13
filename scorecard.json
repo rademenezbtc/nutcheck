@@ -56,5 +56,6 @@
       "link_text": "CDK PR #2888"
     }
   ],
-  "nwc_max_sat_per_run": 1000
+  "nwc_max_sat_per_run": 1000,
+  "stash_dir": "data/stash"
 }

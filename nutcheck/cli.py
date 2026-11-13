@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import __version__, checks_free, checks_funded
-from .client import MintClient
+from .client import Inconclusive, MintClient
 from .grade import grade
 from .model import Result, Severity, Status
 from .wallet import Wallet
@@ -53,6 +53,11 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
         results += free
         if not free_only and wallet.keysets:
             results += checks_funded.run(client, wallet, info, fund, wait, on_invoice)
+    except Inconclusive as e:
+        results.append(Result(
+            "nutcheck.inconclusive", "Mint answered every request", "-", Severity.INFO, Status.ERROR,
+            f"Run incomplete: {e}. The remaining checks were not run. This is not a mark against the mint; "
+            "it usually means the mint was busy or limits how fast one client may send requests."))
     except Exception as e:  # noqa: BLE001
         results.append(Result("nutcheck.crash", "NutCheck completed", "-", Severity.INFO, Status.ERROR,
                               f"{type(e).__name__}: {e}", evidence={"trace": traceback.format_exc()[-2000:]}))
@@ -69,6 +74,7 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None):
         **g,
         "spent_sat": (fund - wallet.balance) if funded_ran else 0,
         "requests": len(client.log),
+        "rate_limited": client.rate_limited,
         "mint_info": {
             "name": info.get("name"), "version": info.get("version"),
             "description": info.get("description"), "contact": info.get("contact"),
@@ -173,7 +179,12 @@ def cmd_sweep(argv):
         if not uri:
             print("--nwc given but NWC_URL is not set", file=sys.stderr)
             return 2
-        funder = Funder(NWC(uri), int(cfg.get("nwc_max_sat_per_run", 1000)))
+        funder = Funder(NWC(uri), int(cfg.get("nwc_max_sat_per_run", 1000)),
+                        stash_dir=base / cfg.get("stash_dir", "stash"))
+        for line in funder.recover():
+            print(f"stash: {line}")
+            if "recovered" not in line and "nothing left" not in line:
+                funder.alerts.append(f"stash: {line}")
     for m in cfg["mints"]:
         slug = mint_slug(m["url"])
         if a.only and slug not in a.only:

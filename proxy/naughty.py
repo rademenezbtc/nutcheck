@@ -39,9 +39,11 @@ MODES = {
     "keep_change": "pay the invoice but keep the overpaid fee change",
     "info_lie": "claim NUT-07 checkstate but answer 404",
     "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
+    "rate_limit_burst": "answer 429 to every 8th request, twice in a row (a mint with a strict nginx limit)",
+    "rate_limit_hard": "answer 429 to everything after the first 25 requests (a mint that throttles hard)",
 }
 
-state = {"modes": set(), "paid": set()}
+state = {"modes": set(), "paid": set(), "count": 0, "burst": 0}
 upstream: httpx.AsyncClient
 
 
@@ -100,7 +102,20 @@ async def handle(request: Request):
             if unknown:
                 return JSONResponse({"error": f"unknown modes {sorted(unknown)}", "available": MODES}, 400)
             state["modes"] = modes
+            state["count"] = state["burst"] = 0
         return JSONResponse({"modes": sorted(state["modes"]), "available": MODES})
+
+    if path.startswith("/v1/"):
+        state["count"] += 1
+        if on("rate_limit_hard") and state["count"] > 25:
+            return Response("<html><body><h1>429 Too Many Requests</h1></body></html>", 429, media_type="text/html")
+        if on("rate_limit_burst"):
+            if state["burst"] > 0:
+                state["burst"] -= 1
+                return Response("<html><body><h1>429 Too Many Requests</h1></body></html>", 429, media_type="text/html")
+            if state["count"] % 8 == 0:
+                state["burst"] = 1
+                return Response("<html><body><h1>429 Too Many Requests</h1></body></html>", 429, media_type="text/html")
 
     if path == "/__paid":
         state["paid"].add(req_json["invoice"])
