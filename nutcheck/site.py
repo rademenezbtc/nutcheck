@@ -216,13 +216,11 @@ ICONS = {
 }
 LOCK = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
 LOGO = ('<svg width="36" height="36" viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-28 58 60)">'
-        '<circle cx="58" cy="36" r="24" fill="#C98A3E"/><circle cx="58" cy="78" r="28" fill="#C98A3E"/>'
-        '<path d="M37 52 Q58 62 79 52 L82 62 Q58 70 34 62 Z" fill="#C98A3E"/></g>'
+        '<path d="M58 12 C71 12 82 22 82 36 C82 46 74 49 74 56 C74 63 86 68 86 80 C86 96 73 108 58 108 C43 108 30 96 30 80 C30 68 42 63 42 56 C42 49 34 46 34 36 C34 22 45 12 58 12 Z" fill="#C98A3E"/></g>'
         '<circle cx="90" cy="88" r="27" fill="#FFFFFF"/><circle cx="90" cy="88" r="22" fill="#0E7A5A"/>'
         '<path d="M79 88 L87 96 L102 79" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 FAVICON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g transform="rotate(-28 58 60)">'
-           '<circle cx="58" cy="36" r="24" fill="#C98A3E"/><circle cx="58" cy="78" r="28" fill="#C98A3E"/>'
-           '<path d="M37 52 Q58 62 79 52 L82 62 Q58 70 34 62 Z" fill="#C98A3E"/></g>'
+           '<path d="M58 12 C71 12 82 22 82 36 C82 46 74 49 74 56 C74 63 86 68 86 80 C86 96 73 108 58 108 C43 108 30 96 30 80 C30 68 42 63 42 56 C42 49 34 46 34 36 C34 22 45 12 58 12 Z" fill="#C98A3E"/></g>'
            '<circle cx="90" cy="88" r="29" fill="#F6F6F3"/><circle cx="90" cy="88" r="24" fill="#0E7A5A"/>'
            '<path d="M78 88 L87 97 L103 78" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>\n')
 WORD = {"p": "passed", "f": "failed", "w": "warning", "s": "not run"}
