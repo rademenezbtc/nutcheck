@@ -20,6 +20,7 @@ from html import escape
 from pathlib import Path
 
 from .cli import load_config, mint_slug
+from .grade import regrade
 from .model import CATEGORIES, FREE_CATEGORIES, FUNDED_CATEGORIES, category_of
 
 # grade → (tile background, tile text, soft background, soft text, history bar)
@@ -198,6 +199,37 @@ class MintView:
         return "\n".join(lines)
 
 
+CARRY_FUNDED_DAYS = 8  # a free-only run keeps funded results up to this old (covers a weekly funded run)
+
+
+def _has_funded(report: dict) -> bool:
+    return any(r.get("funded") and r["status"] in ("pass", "fail", "warn") for r in report["results"])
+
+
+def with_funded(report: dict, earlier: list[dict]) -> dict:
+    """Free-only runs happen more often than funded ones. Combine a free-only run with the most recent
+    funded results, so a mint's grade doesn't flip between B and A* depending on which kind ran last.
+    Funded results are not carried over a change in the mint's software version: they may no longer hold."""
+    if not report.get("reachable", True) or _has_funded(report):
+        return report
+    t = datetime.fromisoformat(report["started"])
+    version = report.get("mint_info", {}).get("version")
+    for prev in reversed(earlier):
+        if t - datetime.fromisoformat(prev["started"]) > timedelta(days=CARRY_FUNDED_DAYS):
+            break
+        if not prev.get("reachable", True) or not _has_funded(prev):
+            continue
+        if prev.get("mint_info", {}).get("version") != version:
+            break
+        merged = dict(report)
+        merged["results"] = ([r for r in report["results"] if not r.get("funded")]
+                             + [dict(r, carried_from=prev["started"]) for r in prev["results"] if r.get("funded")])
+        merged.update(regrade(merged["results"]))
+        merged["funded_from"] = prev["started"]
+        return merged
+    return report
+
+
 def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list[MintView]:
     reports_dir = base / cfg.get("reports_dir", "reports")
     views = []
@@ -206,7 +238,8 @@ def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list
         files = sorted((reports_dir / slug).glob("*.json"))
         if not files:
             continue
-        reports = [json.loads(f.read_text()) for f in files]
+        raw = [json.loads(f.read_text()) for f in files]
+        reports = [with_funded(r, raw[:i]) for i, r in enumerate(raw)]
         v = MintView(m, slug, reports, reports[-1], site_cfg=cfg)
         latest_severe = {r["id"] for r in v.latest["results"] if r["status"] == "fail" and r["severity"] in SEVERE}
         if not v.latest.get("reachable", True):
@@ -507,6 +540,8 @@ def render_mint(v: MintView, cfg: dict) -> str:
     if active:
         tags.append(f'<span class="tag">{escape(active[0]["unit"])} · {escape(v.fee)}</span>')
         tags.append(f'<span class="tag mono">keyset {escape(active[0]["id"][:12])}…</span>')
+    if L.get("funded_from"):
+        tags.append(f'<span class="tag">funded checks from {escape(fmt_time(L["funded_from"]))}</span>')
     fails = v.fails
     passes = [r for r in L["results"] if r["status"] == "pass"]
     skips = [r for r in L["results"] if r["status"] == "skip"]
@@ -639,7 +674,7 @@ def feed(views: list[MintView], base_url: str) -> dict:
     out = []
     for v in views:
         e = {"url": v.url, "name": v.name, "grade": v.latest["grade"], "partial": v.latest.get("partial", False),
-             "reachable": v.latest.get("reachable", True), "tested": v.latest["started"], "withheld": v.withheld,
+             "reachable": v.latest.get("reachable", True), "tested": v.latest["started"], "funded_tested": v.latest.get("funded_from") or (v.latest["started"] if _has_funded(v.latest) else None), "withheld": v.withheld,
              "page": f"{base_url}mints/{v.slug}.html", "badge": f"{base_url}badge/{v.slug}.svg"}
         if v.withheld:
             e["details_published"] = v.publish_on.isoformat()

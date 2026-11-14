@@ -7,7 +7,7 @@
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
 
-**Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested every day, with real sats on Mondays.
+**Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested every 6 hours, with real sats once a day.
 
 Point NutCheck at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it: the request and response that exposed each failure.
 
@@ -88,7 +88,7 @@ Open an [issue](https://github.com/rademenezbtc/nutcheck/issues/new) with your m
 {"url": "https://mint.example.com", "funded": "nwc"}
 ```
 
-`"funded": "nwc"` lets the weekly run spend about 15 sat of NutCheck's own money on your mint and pay the rest back; `false` runs the free checks only. Then add your badge:
+`"funded": "nwc"` lets the daily funded run spend about 15 sat of NutCheck's own money on your mint and pay the rest back; `false` runs the free checks only. Then add your badge:
 
 ```markdown
 [![NutCheck](https://nutcheck.org/badge/mint.example.com.svg)](https://nutcheck.org/mints/mint.example.com.html)
@@ -124,17 +124,19 @@ nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
-`.github/workflows/scorecard.yml` runs the sweep daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed.
+`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. For funded checks, store an NWC connection string (send and receive) as the repository secret `NWC_URL`. Only the sweep step can read it, and it never appears in logs or reports. Give NutCheck a wallet that only holds what you're willing to spend.
-3. **Actions → Scorecard → Run workflow** for the first run. Tick **funded** to run the paid checks now (they otherwise run on Mondays), and optionally name one mint under **only**.
+3. **Actions → Scorecard → Run workflow** for the first run. Tick **funded** to run the paid checks now (they otherwise run daily at 05:17 UTC), and optionally name one mint under **only**.
 4. Optional: a custom domain (Settings → Pages → Custom domain; set `base_url` in `scorecard.json` to match).
 
 **When the run fails with "NutCheck needs your attention",** either NutCheck found a critical or high failure, or funding went wrong. GitHub emails you about the failed run, and the run summary says which. For a mint failure, contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
 
 Notes:
-- `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run every day for free.
+- Between funded runs, a mint's page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so grades don't flip between B and A* every 6 hours.
+- `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run every time, for free.
+- An unresolved serious failure fails every run, so GitHub emails you up to 4 times a day until you set `"notified"`.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count. If the workflow ever shows as disabled, re-enable it in the Actions tab.
 - GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck and behave differently. That's an open problem.
 - `demo/run_demo.sh` builds a demo scorecard from real runs: one naughty-proxy instance per fault mode, swept six times, with one mint that regresses halfway through and one still inside its disclosure window.
@@ -146,7 +148,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 51 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 53 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026

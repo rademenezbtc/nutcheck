@@ -29,3 +29,10 @@ def grade(results: list[Result]) -> dict:
         "counts": {s.value: sum(1 for r in results if r.status == s) for s in St},
         "errors": errors,
     }
+
+
+def regrade(results: list[dict]) -> dict:
+    """Grade a list of results as stored in a JSON report."""
+    rs = [Result(r["id"], r["title"], r["nut"], S(r["severity"]), St(r["status"]), r["summary"], r.get("funded", False))
+          for r in results]
+    return grade(rs)

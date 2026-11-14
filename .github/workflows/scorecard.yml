@@ -1,15 +1,17 @@
-# Daily NutCheck sweep: test every mint in scorecard.json, keep the reports on the `data`
-# branch, publish the scorecard to GitHub Pages, and fail loudly (GitHub emails you) when a
-# serious failure needs reporting to a mint operator before its details go public.
+# NutCheck sweep: test every mint in scorecard.json, keep the reports on the `data` branch,
+# publish the scorecard to GitHub Pages, and fail loudly (GitHub emails you) when a serious
+# failure needs reporting to a mint operator before its details go public.
+# Free checks every 6 hours; funded checks (real sats, from the NWC wallet) once a day.
 name: Scorecard
 
 on:
   schedule:
-    - cron: "17 5 * * *"   # 05:17 UTC daily (off the hour; GitHub delays top-of-hour runs)
+    - cron: "17 5 * * *"          # 05:17 UTC: funded run (off the hour; GitHub delays top-of-hour runs)
+    - cron: "17 11,17,23 * * *"   # every 6 hours in between: free checks only
   workflow_dispatch:
     inputs:
       funded:
-        description: 'Fund the "nwc" mints from the NWC wallet now (scheduled runs do this on Mondays)'
+        description: 'Fund the "nwc" mints from the NWC wallet now (the scheduled 05:17 UTC run does this daily)'
         type: boolean
         default: false
       only:
@@ -58,10 +60,10 @@ jobs:
           NWC_URL: ${{ secrets.NWC_URL }}   # only this step can see the wallet connection
           FUNDED_INPUT: ${{ inputs.funded }}
           ONLY: ${{ inputs.only }}
-          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           args=()
-          if [ "$FUNDED_INPUT" = "true" ] || { [ "$EVENT" = "schedule" ] && [ "$(date -u +%u)" = "1" ]; }; then
+          if [ "$FUNDED_INPUT" = "true" ] || [ "$SCHEDULE" = "17 5 * * *" ]; then
             if [ -n "$NWC_URL" ]; then
               args+=(--nwc --funding-alerts funding-alerts.txt)
             else

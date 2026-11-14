@@ -136,3 +136,42 @@ def test_known_issue_version_bound():
     assert not known_issue(cfg, rep("Nutshell/0.21.0"), "p2pk.malformed")
     assert not known_issue(cfg, rep("Nutshell/0.22.1"), "p2pk.malformed")
     assert not known_issue(cfg, rep("cdk-mintd/0.18.1"), "p2pk.malformed")
+
+
+def _free_only(slug, url, when, version="Nutshell/0.21.0"):
+    r = _report(slug, url, when)
+    r["results"].append({"id": "p2pk.malformed", "title": "Malformed lock rejected", "nut": "11", "severity": "medium",
+                         "status": "skip", "summary": "not funded", "funded": True, "evidence": {}, "category": "Locks"})
+    r["partial"] = True
+    r["mint_info"]["version"] = version
+    return r
+
+
+def _feed(tmp_path, reports):
+    url, slug = "http://127.0.0.1:3399", "127.0.0.1_3399"
+    d = tmp_path / "reports" / slug
+    d.mkdir(parents=True)
+    for i, mk in enumerate(reports):
+        (d / f"{i}.json").write_text(json.dumps(mk(slug, url, T0 + timedelta(hours=6 * i))))
+    (tmp_path / "scorecard.json").write_text(json.dumps({"mints": [{"url": url}], "embargo_days": 14}))
+    out = _build(tmp_path, T0 + timedelta(days=1))
+    return json.loads((out / "api" / "mints.json").read_text())["mints"][0], out
+
+
+def _funded_b(slug, url, when):
+    r = _report(slug, url, when, [("p2pk.malformed", "medium")])
+    r["grade"] = "B"
+    return r
+
+
+def test_free_run_keeps_latest_funded_results(tmp_path):
+    feed, out = _feed(tmp_path, [_funded_b, _free_only, _free_only])
+    assert feed["grade"] == "B" and not feed["partial"]
+    assert feed["funded_tested"] == T0.isoformat() and feed["tested"] == (T0 + timedelta(hours=12)).isoformat()
+    assert "Grades over the last 3 runs: B B B" in (out / "index.html").read_text()
+
+
+def test_funded_results_not_carried_across_upgrade(tmp_path):
+    upgraded = lambda s, u, w: _free_only(s, u, w, version="Nutshell/0.22.0")
+    feed, _ = _feed(tmp_path, [_funded_b, upgraded])
+    assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None

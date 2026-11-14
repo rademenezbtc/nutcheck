@@ -53,13 +53,13 @@ The scorecard went live at https://rademenezbtc.github.io/nutcheck/ (now https:/
 
 ## Status (14 Nov)
 
-Live at **https://nutcheck.org**, re-tested daily, with funded checks on Mondays or on demand.
+Live at **https://nutcheck.org**: free checks every 6 hours, funded checks daily.
 
 - **Funded checks on live mints work.** A Rizful wallet over Nostr Wallet Connect pays each mint's 64-sat invoice; NutCheck runs the funded checks and melts the rest back. About 15 sat per mint per run. Leftovers that can't be paid back are stored NIP-44-encrypted on the `data` branch and recovered next run.
 - **Results (9 live mints + testnut):** A for Chorus, Coinos and Cuba Bitcoin. B for every CDK mint (Minibits, Macadamia, WesternBTC, testnut) and for Voltz (Nutshell 0.20.3), all for accepting duplicated P2PK tags. CDK's fix is in review ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888)); Nutshell fixed it in 0.21.0 ([nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008)). Agorist (Lightning backend can't create invoices) and 8333.space (minting disabled) are free checks only (A*).
 - **Lesson: rate limits create false results.** Nutshell's limiter (20 tx/min, elastic window) turned a funded run into a string of 429s, which early NutCheck read as "refused" (false pass) or "error" (false fail), and stranded 53 sat. Now: 429 and 5xx are *inconclusive*, POSTs are paced at 3.3 s on Nutshell, and leftover ecash is never lost.
 - **Scorecard:** free checks grouped before funded ones, problems in hover tooltips, known upstream issues explained in place with links, badges and a JSON feed.
-- **CI** runs all 51 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
+- **CI** runs all 53 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
 
 ## Plan to the 17 Nov show-and-tell
 
@@ -91,7 +91,7 @@ Live at **https://nutcheck.org**, re-tested daily, with funded checks on Mondays
 
 ## Costs
 
-About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). Funded runs are weekly, so 9 live mints cost about 135 sat a week, under 600 sat a month; testnut is free. Daily funding of 20 mints would be about 9,000 sat a month. Hosting is free (GitHub Actions and Pages); the domain is the only fixed cost.
+About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). Funded runs are daily: measured on 14 Nov at about 107 sat a day for the 7 mints that can be funded (Minibits only 4 sat, having no input fee), so about 3,200 sat a month; testnut is free. Each extra funded mint adds about 500 sat a month. Hosting is free (GitHub Actions and Pages); the domain is the only fixed cost.
 
 ## Submission checklist
 
