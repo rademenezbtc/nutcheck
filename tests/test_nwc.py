@@ -84,3 +84,11 @@ def test_wallet_refuses_payment(tmp_path, monkeypatch):
         (rep,), alerts = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}])
     assert rep["partial"]
     assert "could not pay a funding invoice" in alerts
+
+
+def test_test_mint_never_touches_the_real_wallet(tmp_path, monkeypatch):
+    httpx.post(PROXY + "/__naughty", json={"modes": []})  # auto-paid, like testnut
+    with FakeRelayWallet(7706, proxy_url=PROXY, mint_url=MINT) as w:
+        (rep,), _ = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": True, "wait": 20}])
+    assert w.paid == [] and w.invoices == [], "fake-Lightning mints must not pay into or out of the wallet"
+    assert "funding" not in rep and not rep["partial"]

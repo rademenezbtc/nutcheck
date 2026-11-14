@@ -206,7 +206,7 @@ def cmd_sweep(argv):
         paid_before = funder.paid_out if funder else 0
         report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
                                on_invoice=on_invoice, preload=preload)
-        if funder and (use_nwc or wallet.proofs):
+        if funder and mode == "nwc":  # never pay a test mint's fake ecash back into the real wallet
             paid_in = funder.paid_out - paid_before
             report["funding"] = {"source": "nwc", "paid_in": paid_in, "funded": paid_in > 0,
                                  "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}

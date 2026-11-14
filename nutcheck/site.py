@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -94,12 +95,22 @@ def phrase_for(r: dict) -> str:
 SEV_ORDER = ["critical", "high", "medium", "low", "info"]
 
 
+def _version_tuple(v: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", v)[:4])
+
+
 def known_issue(cfg: dict, report: dict, check_id: str) -> dict | None:
-    """A config entry explaining a failure that comes from the mint's software, e.g. a bug fixed upstream."""
+    """A config entry explaining a failure that comes from the mint's software, e.g. a bug fixed upstream.
+    Matches on check id, a software name fragment, and optionally "below": versions older than a fix."""
     version = (report.get("mint_info", {}).get("version") or "").lower()
     for k in cfg.get("known_issues", []):
-        if k.get("check") == check_id and k.get("software", "").lower() in version:
-            return k
+        if k.get("check") != check_id or k.get("software", "").lower() not in version:
+            continue
+        if k.get("below"):
+            found = _version_tuple(version.split("/")[-1])
+            if not found or found >= _version_tuple(k["below"]):
+                continue
+        return k
     return None
 
 
@@ -117,7 +128,8 @@ class MintView:
 
     @property
     def name(self):
-        return self.cfg.get("name") or self.latest["mint_info"].get("name") or self.slug
+        name = self.cfg.get("name") or self.latest["mint_info"].get("name") or self.slug
+        return name.strip().strip('"\'“”').strip() or self.slug
 
     @property
     def url(self):
@@ -157,17 +169,32 @@ class MintView:
     @property
     def meta(self) -> str:
         if self.grade == "—":
-            return f"Unreachable since {fmt_time(self.latest['started'])}"
-        if self.withheld:
-            return f"{self.software} · {self.fee}"
-        fails = [r for r in self.fails if r["status"] == "fail"]
-        if fails:
-            known = known_issue(self.site_cfg, self.latest, fails[0]["id"])
-            return phrase_for(fails[0]) + (" · known upstream issue, fix pending" if known else "")
-        warns = self.fails
-        extra = f" · {warns[0]['summary'][:60]}" if warns else ""
+            return "Unreachable in the last run"
         partial = " · free checks only" if self.latest.get("partial") else ""
-        return f"{self.software} · {self.fee}{partial}{extra}"
+        return f"{self.software} · {self.fee}{partial}"
+
+    def tip(self, cat: str, state: str) -> str:
+        """Tooltip for one category mark: what was checked, and what went wrong if anything."""
+        rs = [r for r in self.latest["results"] if r.get("category") == cat]
+        if state == "p":
+            return f"{cat}: all {sum(r['status'] == 'pass' for r in rs)} checks passed"
+        bad = [r for r in rs if r["status"] in ("fail", "warn", "error")]
+        if not bad:
+            why = "funded checks not run this time" if self.latest.get("partial") else "not applicable"
+            return f"{cat}: {why}"
+        lines = [f"{cat}:"]
+        for r in bad:
+            first = r["summary"].removeprefix("Run incomplete: ").split(". ")[0].rstrip(".")
+            first = first[:1].upper() + first[1:]
+            if len(first) > 150:
+                first = first[:147].rstrip() + "…"
+            label = {"fail": "Failed", "warn": "Warning", "error": "Inconclusive"}[r["status"]]
+            line = f"{label}: {first}"
+            k = known_issue(self.site_cfg, self.latest, r["id"]) if r["status"] == "fail" else None
+            if k:
+                line += f" ({k.get('label', 'known upstream issue, fix pending')})"
+            lines.append(line)
+        return "\n".join(lines)
 
 
 def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list[MintView]:
@@ -266,7 +293,10 @@ table.mints td:first-child,table.mints th:first-child{padding-left:20px}
 table.mints td:last-child,table.mints th:last-child{padding-right:20px;text-align:right}
 .gt{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;padding:0 6px;border-radius:10px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}
 .mname{font-weight:600;color:#15171C;text-decoration:none;font-size:15px}
-.chip{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px}
+.chip{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;position:relative;cursor:default}
+.chip:focus{outline:2px solid #2E3FB8;outline-offset:2px}
+.tip{display:none;position:fixed;z-index:50;width:max-content;max-width:300px;background:#15171C;color:#F6F6F3;font-size:12.5px;line-height:1.45;font-weight:400;text-align:left;white-space:pre-line;padding:8px 11px;border-radius:8px;box-shadow:0 6px 20px rgba(21,23,28,.18);pointer-events:none}
+.chip:hover .tip,.chip:focus .tip{display:block}
 .chip.p{background:#E7F4EE}.chip.f{background:#FBE3DC}.chip.w{background:#FCEFD6}.chip.s{background:#F1F1EE}
 .hist{display:flex;gap:3px}.hist span{width:8px;height:22px;border-radius:2px}
 .withheld{display:inline-flex;gap:8px;align-items:center;background:#F4F4F1;border:1px dashed #C9C9C2;border-radius:8px;padding:8px 12px;font-size:13px;color:#3F4450}
@@ -374,7 +404,8 @@ def render_index(views: list[MintView], cfg: dict) -> str:
                      f'{fmt_day(v.publish_on)}, or when fixed.</span></td>')
         else:
             cells = "".join(
-                f'<td class="c"><span class="chip {s}" title="{c}: {WORD[s]}" aria-label="{c}: {WORD[s]}">{ICONS[s]}</span></td>'
+                f'<td class="c"><span class="chip {s}" tabindex="0" aria-label="{escape(v.tip(c, s))}">{ICONS[s]}'
+                f'<span class="tip" aria-hidden="true">{escape(v.tip(c, s))}</span></span></td>'
                 for c, s in v.cats.items())
         rows.append(f"""<tr data-band="{v.band}">
 <td>{grade_tile(v.grade)}</td>
@@ -409,6 +440,11 @@ nutcheck https://your.mint</code></div>
 <div class="card"><h2>Responsible disclosure</h2><p>Critical and high failures are reported to the operator first. Details appear here {cfg['_embargo']} days after the failure was first seen, or once it is fixed.</p></div>
 </section></main>
 <script>
+document.querySelectorAll('.chip').forEach(function(c){{var t=c.querySelector('.tip');if(!t)return;
+function place(){{t.style.display='block';var r=c.getBoundingClientRect(),w=t.offsetWidth,h=t.offsetHeight;
+var left=Math.min(Math.max(8,r.left+r.width/2-w/2),window.innerWidth-w-8);
+var top=r.top-h-8<8?r.bottom+8:r.top-h-8;t.style.left=left+'px';t.style.top=top+'px';t.style.display='';}}
+c.addEventListener('mouseenter',place);c.addEventListener('focus',place);}});
 document.querySelectorAll('.pill').forEach(function(b){{b.addEventListener('click',function(){{
 document.querySelectorAll('.pill').forEach(function(x){{x.setAttribute('aria-pressed',x===b?'true':'false')}});
 var band=b.dataset.band;document.querySelectorAll('tr[data-band]').forEach(function(r){{

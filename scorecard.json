@@ -53,7 +53,17 @@
       "software": "cdk-mintd",
       "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. The fix is in review upstream; mints pass once they run a CDK release that includes it.",
       "url": "https://github.com/cashubtc/cdk/pull/2888",
-      "link_text": "CDK PR #2888"
+      "link_text": "CDK PR #2888",
+      "label": "known CDK issue, fix pending"
+    },
+    {
+      "check": "p2pk.malformed",
+      "software": "nutshell",
+      "below": "0.21.0",
+      "text": "Nutshell versions before 0.21.0 accept duplicated spending-condition tags. Fixed in Nutshell 0.21.0; upgrading the mint fixes it.",
+      "url": "https://github.com/cashubtc/nutshell/pull/1008",
+      "link_text": "Nutshell PR #1008",
+      "label": "fixed in Nutshell 0.21.0: upgrade"
     }
   ],
   "nwc_max_sat_per_run": 1000,

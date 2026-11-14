@@ -115,3 +115,24 @@ def test_known_issue_note(tmp_path):
     (tmp_path / "scorecard.json").write_text(json.dumps(cfg))
     out = _build(tmp_path, T0 + timedelta(days=7))
     assert "Known issue" not in (out / "mints" / f"{slug}.html").read_text()
+
+
+def test_problems_live_in_tooltips_not_under_the_name(tmp_path):
+    slug = _setup(tmp_path, disclosed=True)
+    out = _build(tmp_path, T0 + timedelta(days=7))
+    html = (out / "index.html").read_text()
+    row = html[html.index('data-band='):]
+    meta = row[row.index('class="small muted" style="margin-top:4px">'):][:200]
+    assert "SECRET-DETAIL" not in meta and "Failed" not in meta
+    assert 'class="tip"' in html and "Failed: SECRET-DETAIL p2pk.basic" in html
+    assert "Keys: all 1 checks passed" in html
+
+
+def test_known_issue_version_bound():
+    from nutcheck.site import known_issue
+    cfg = {"known_issues": [{"check": "p2pk.malformed", "software": "nutshell", "below": "0.21.0", "text": "x"}]}
+    rep = lambda v: {"mint_info": {"version": v}}
+    assert known_issue(cfg, rep("Nutshell/0.20.3"), "p2pk.malformed")
+    assert not known_issue(cfg, rep("Nutshell/0.21.0"), "p2pk.malformed")
+    assert not known_issue(cfg, rep("Nutshell/0.22.1"), "p2pk.malformed")
+    assert not known_issue(cfg, rep("cdk-mintd/0.18.1"), "p2pk.malformed")
