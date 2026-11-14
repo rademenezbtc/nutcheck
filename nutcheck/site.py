@@ -364,7 +364,7 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <nav class="main" aria-label="Main">{links}</nav>
 <a class="btn dark" href="{repo}">Test your mint</a></div></header>
 <div class="wrap">{body}</div>
-<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · results reproducible with <code>pip install nutcheck</code> · <a href="{root}api/mints.json">JSON feed</a></footer>
+<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a> · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
 </body></html>"""
 
 
@@ -445,8 +445,9 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <span><b style="color:#1F5596">B</b> spec violation, limited impact</span><span><b style="color:#0B5D45">A−</b> warnings only</span></div></section>
 <section class="three">
 <div class="card"><h2>Check it yourself</h2><p style="margin-bottom:12px">Every grade can be reproduced with the same open-source tool, including on a mint you are about to launch.</p>
-<code class="block">pip install nutcheck
-nutcheck https://your.mint</code></div>
+<code class="block">uvx --from git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))} \\
+  nutcheck https://your.mint</code>
+<p class="small muted" style="margin:10px 0 0">Or <code>pip install git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))}</code>. Add <code>--free-only</code> to skip the checks that spend a few sats.</p></div>
 <div class="card"><h2>Evidence, not opinions</h2><p>Each mint page shows the exact request and response behind every failure. Proofs are reduced to counts so published evidence can never be spent.</p></div>
 <div class="card"><h2>Responsible disclosure</h2><p>Critical and high failures are reported to the operator first. Details appear here {cfg['_embargo']} days after the failure was first seen, or once it is fixed.</p></div>
 </section></main>

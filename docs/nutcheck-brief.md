@@ -44,12 +44,22 @@ A reverse proxy in front of an honest FakeWallet mint that misbehaves on cue, so
 
 ## First live runs (13 Nov)
 
-The scorecard is live at https://rademenezbtc.github.io/nutcheck/, rebuilt daily by a GitHub Actions workflow (free runners, report history on the `data` branch, GitHub Pages).
+The scorecard went live at https://rademenezbtc.github.io/nutcheck/ (now https://nutcheck.org), rebuilt daily by a GitHub Actions workflow (free runners, report history on the `data` branch, GitHub Pages).
 
 - **10 mints tested:** 6 run Nutshell (0.17.0 to 0.22.1), 4 run CDK (0.17.6 to 0.18.3).
 - **9 live mints, free checks only:** all A* (keys, keyset IDs, forged ecash refused, HTTPS, honest info page).
 - **testnut.cashu.space, full funded run (cdk-mintd 0.18.1): B.** 26 of 27 checks pass, including DLEQ, double spend, overspend, every P2PK/HTLC lock and fee refunds. It accepts a P2PK secret with a duplicated `locktime` tag, which NUT-11 says MUST be rejected. CDK does this by design: current `master` keeps the first copy of a duplicated tag, and has a test asserting it, so it likely applies to every CDK mint. Already public in CDK's code, so no embargo; to raise openly with CDK and the spec authors.
 - **Lesson:** the first live run graded testnut F because NutCheck labelled this check critical ("anyone could take it"), although the spend carried a valid signature from the locking key. Reclassified as medium and the wrong report withdrawn from the history. Severity must describe the actual consequence of the specific spend, not the category of check.
+
+## Status (14 Nov)
+
+Live at **https://nutcheck.org**, re-tested daily, with funded checks on Mondays or on demand.
+
+- **Funded checks on live mints work.** A Rizful wallet over Nostr Wallet Connect pays each mint's 64-sat invoice; NutCheck runs the funded checks and melts the rest back. About 15 sat per mint per run. Leftovers that can't be paid back are stored NIP-44-encrypted on the `data` branch and recovered next run.
+- **Results (9 live mints + testnut):** A for Chorus, Coinos and Cuba Bitcoin. B for every CDK mint (Minibits, Macadamia, WesternBTC, testnut) and for Voltz (Nutshell 0.20.3), all for accepting duplicated P2PK tags. CDK's fix is in review ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888)); Nutshell fixed it in 0.21.0 ([nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008)). Agorist (Lightning backend can't create invoices) and 8333.space (minting disabled) are free checks only (A*).
+- **Lesson: rate limits create false results.** Nutshell's limiter (20 tx/min, elastic window) turned a funded run into a string of 429s, which early NutCheck read as "refused" (false pass) or "error" (false fail), and stranded 53 sat. Now: 429 and 5xx are *inconclusive*, POSTs are paced at 3.3 s on Nutshell, and leftover ecash is never lost.
+- **Scorecard:** free checks grouped before funded ones, problems in hover tooltips, known upstream issues explained in place with links, badges and a JSON feed.
+- **CI** runs all 51 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
 
 ## Plan to the 17 Nov show-and-tell
 
@@ -57,7 +67,8 @@ The scorecard is live at https://rademenezbtc.github.io/nutcheck/, rebuilt daily
 |---|---|
 | Fri 13 | ✅ Spike: CLI, checks, proxy, fault matrix |
 | Fri 13 | ✅ Static scorecard, daily GitHub workflow, first live runs (10 mints, CDK and Nutshell) |
-| Sat 14 | Funded checks on live mints via a Nostr Wallet Connect wallet (leftover sats paid back each run); raise the duplicate-tag issue with CDK |
+| Fri 13 | ✅ Funded checks on live mints via Nostr Wallet Connect (leftover sats paid back each run); duplicate-tag issue traced to CDK PR #2888 and Nutshell PR #1008 |
+| Sat 14 | ✅ Rate-limit-safe client, encrypted leftover recovery, scorecard polish, nutcheck.org, CI |
 | Sun 15 | Signed Nostr publishing (event kind and tags to decide, see open questions) |
 | Mon 16 | Error-code check, `SIG_ALL` tests, keep testing after a `fee_lie` failure instead of stopping; rehearse the demo |
 | Tue 17 | Show-and-tell: honest mint → A, then flip proxy modes live and watch the grade fall with evidence |
@@ -80,13 +91,16 @@ The scorecard is live at https://rademenezbtc.github.io/nutcheck/, rebuilt daily
 
 ## Costs
 
-About 11 sat per funded run per mint. 20 mints × daily runs ≈ 220 sat/day ≈ 6,600 sat/month. The original brief estimated about $5/month; the dollar figure depends on the BTC price. Hosting the daemon and a static page is close to free.
+About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). Funded runs are weekly, so 9 live mints cost about 135 sat a week, under 600 sat a month; testnut is free. Daily funding of 20 mints would be about 9,000 sat a month. Hosting is free (GitHub Actions and Pages); the domain is the only fixed cost.
 
 ## Submission checklist
 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
 - [ ] Recording of the proxy demo (honest → faults → honest)
-- [ ] At least 5 live mints graded with the funded checks, with any disclosures sent before results are public (10 graded on free checks so far)
+- [x] At least 5 live mints graded with the funded checks (7 so far; the only failure is already public upstream, so nothing to embargo)
 - [ ] Nostr events visible in a client
-- [x] Scorecard page live
-- [ ] This brief updated with what changed
+- [x] Scorecard page live at nutcheck.org
+- [x] CI running the fault matrix against a real mint
+- [x] This brief updated with what changed
+- [ ] Comment on CDK PR #2888 with NutCheck's evidence; tell the Voltz operator about Nutshell 0.21.0
+- [ ] Submit at nutnovember.org/form before 27 Nov 23:59 UTC, saying all work is new since 13 Nov

@@ -1,0 +1,44 @@
+name: Tests
+
+# Unit tests, the official NUT/BIP-340/NIP-44 vectors, and the end-to-end matrix:
+# a real Nutshell FakeWallet mint behind the naughty proxy, one run per fault mode.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install Nutshell 0.21.0 (the honest test mint)
+        run: |
+          uv venv -p 3.12 .mintenv
+          VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt
+      - name: Install NutCheck
+        run: |
+          uv venv -p 3.12 .venv
+          VIRTUAL_ENV=.venv uv pip install -e ".[dev,nwc,proxy]"
+      - name: Start mint and naughty proxy
+        run: |
+          nohup run/start_mint.sh mint1 &
+          nohup .venv/bin/python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 > run/proxy.log 2>&1 &
+          for i in $(seq 60); do
+            curl -sf localhost:3338/v1/info >/dev/null && curl -sf localhost:3339/__naughty >/dev/null && exit 0
+            sleep 1
+          done
+          tail -50 run/mint1.log run/proxy.log; exit 1
+      - name: Run tests (none may be skipped)
+        shell: bash
+        run: |
+          .venv/bin/pytest -ra -q | tee pytest.txt
+          if grep -q skipped pytest.txt; then echo "::error::end-to-end tests were skipped"; exit 1; fi
+      - name: Mint logs on failure
+        if: failure()
+        run: tail -100 run/mint1.log run/proxy.log
