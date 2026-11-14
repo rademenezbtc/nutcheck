@@ -2,7 +2,9 @@
 
 # NutCheck
 
-**Get your nuts checked.** SSL Labs for Cashu mints. Point it at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it.
+**Get your nuts checked.** SSL Labs for Cashu mints. Live scorecard: **[nutcheck.org](https://nutcheck.org)**
+
+Point it at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it.
 
 NutCheck measures behaviour, not solvency. An A means the mint follows the rules today. It says nothing about whether the mint holds the bitcoin backing its ecash, or will still be there tomorrow.
 
@@ -68,13 +70,21 @@ nutcheck site scorecard.json -o site/    # build the site from all saved reports
 - **Leftover ecash** from funded sweeps goes to `wallet/<mint>.tokens`, outside the published site. Keep that folder private.
 - Funded sweeps need a way to pay the funding invoice. Until the daemon has a Lightning wallet, use `"funded": false` for live mints, or pay the printed invoice by hand.
 
+**Badge for mint operators:** each mint gets an SVG badge that links to its report page, e.g.
+
+```markdown
+[![NutCheck](https://nutcheck.org/badge/mint.minibits.cash_bitcoin.svg)](https://nutcheck.org/mints/mint.minibits.cash_bitcoin.html)
+```
+
+Wallets can read every grade from the JSON feed at `https://nutcheck.org/api/mints.json`.
+
 ### Hosting on GitHub (no server)
 
 `.github/workflows/scorecard.yml` runs the sweep daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes the site to GitHub Pages.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. **Actions → Scorecard → Run workflow** for the first run (after that it runs daily).
-3. The site appears at `https://<user>.github.io/<repo>/`.
+3. The site appears at `https://<user>.github.io/<repo>/`, or at your own domain (Settings → Pages → Custom domain; set `base_url` in `scorecard.json` to match). This project's runs at [nutcheck.org](https://nutcheck.org).
 4. Edit the mint list in `scorecard.json` and push.
 
 **When the run fails with "A mint operator needs to be notified",** NutCheck has found a critical or high failure. GitHub emails you about the failed run. The site shows only the grade until 14 days after the failure was first seen. Contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.

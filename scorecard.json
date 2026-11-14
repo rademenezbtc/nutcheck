@@ -1,5 +1,6 @@
 {
   "title": "NutCheck",
+  "base_url": "https://nutcheck.org/",
   "repo_url": "https://github.com/rademenezbtc/nutcheck",
   "reports_dir": "data/reports",
   "wallet_dir": "/tmp/nutcheck-wallet",
