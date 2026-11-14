@@ -20,7 +20,7 @@ from html import escape
 from pathlib import Path
 
 from .cli import load_config, mint_slug
-from .model import CATEGORIES
+from .model import CATEGORIES, FREE_CATEGORIES, FUNDED_CATEGORIES, category_of
 
 # grade → (tile background, tile text, soft background, soft text, history bar)
 GRADE_STYLE = {
@@ -53,7 +53,8 @@ FAIL_PHRASE = {
 }
 BLURB = {
     "Keys": "Valid keys, one per amount, keyset IDs re-derive",
-    "Signatures": "DLEQ proofs, forged ecash refused",
+    "Forgery": "Ecash with a made-up signature is refused",
+    "DLEQ": "DLEQ proofs on every signature (mint, swap, change)",
     "Issuing": "Paid quotes issue the full amount, once",
     "Spending": "No overspend or double spend, advertised fee is the real fee",
     "Locks": "P2PK and HTLC conditions enforced",
@@ -175,7 +176,7 @@ class MintView:
 
     def tip(self, cat: str, state: str) -> str:
         """Tooltip for one category mark: what was checked, and what went wrong if anything."""
-        rs = [r for r in self.latest["results"] if r.get("category") == cat]
+        rs = [r for r in self.latest["results"] if category_of(r["id"]) == cat]
         if state == "p":
             return f"{cat}: all {sum(r['status'] == 'pass' for r in rs)} checks passed"
         bad = [r for r in rs if r["status"] in ("fail", "warn", "error")]
@@ -222,7 +223,7 @@ def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list
             v.publish_on = v.first_seen + timedelta(days=embargo_days)
             v.withheld = now < v.publish_on and not m.get("disclosed", False)
         for cat in CATEGORIES:
-            rs = [r for r in v.latest["results"] if r.get("category") == cat]
+            rs = [r for r in v.latest["results"] if category_of(r["id"]) == cat]
             sts = {r["status"] for r in rs}
             v.cats[cat] = ("f" if "fail" in sts else "w" if ("warn" in sts or "error" in sts)
                            else "p" if "pass" in sts else "s")
@@ -289,6 +290,10 @@ table.mints{width:100%;min-width:1080px;font-size:14px}
 table.mints th{text-align:left;color:#5A5F6B;font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;padding:12px 4px}
 table.mints td{padding:14px 4px;border-top:1px solid #ECECE7;vertical-align:middle}
 table.mints .c{text-align:center}
+table.mints .gstart{border-left:1px solid #E3E3DE}
+table.mints tr.groups th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#3F4450;text-align:center;padding:12px 4px 0;border-top:0}
+table.mints tr.groups td{border-top:0;padding:0}
+table.mints thead tr:last-child th{padding-top:6px}
 table.mints td:first-child,table.mints th:first-child{padding-left:20px}
 table.mints td:last-child,table.mints th:last-child{padding-right:20px;text-align:right}
 .gt{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px;padding:0 6px;border-radius:10px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}
@@ -393,8 +398,14 @@ def render_index(views: list[MintView], cfg: dict) -> str:
     pill_html = "".join(
         f'<button type="button" class="pill" data-band="{b}" aria-pressed="{"true" if b == "all" else "false"}">'
         f'{t} <span style="opacity:.7">{c}</span></button>' for b, t, c in pills if c or b == "all")
-    heads = "".join(f'<th scope="col" class="c" title="{escape(BLURB[c])}">{c if c != "Signatures" else "Sigs"}</th>'
-                    for c in CATEGORIES)
+    def _head(c):
+        cls = "c gstart" if c == FUNDED_CATEGORIES[0] else "c"
+        return f'<th scope="col" class="{cls}" title="{escape(BLURB[c])}">{c}</th>'
+    heads = "".join(_head(c) for c in CATEGORIES)
+    group_row = (f'<tr class="groups"><td colspan="2"></td>'
+                 f'<th scope="colgroup" colspan="{len(FREE_CATEGORIES)}">Free checks</th>'
+                 f'<th scope="colgroup" colspan="{len(FUNDED_CATEGORIES)}" class="gstart">Funded checks</th>'
+                 f'<td colspan="2"></td></tr>')
     rows = []
     for v in views:
         if v.withheld:
@@ -404,7 +415,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
                      f'{fmt_day(v.publish_on)}, or when fixed.</span></td>')
         else:
             cells = "".join(
-                f'<td class="c"><span class="chip {s}" tabindex="0" aria-label="{escape(v.tip(c, s))}">{ICONS[s]}'
+                f'<td class="{"c gstart" if c == FUNDED_CATEGORIES[0] else "c"}"><span class="chip {s}" tabindex="0" aria-label="{escape(v.tip(c, s))}">{ICONS[s]}'
                 f'<span class="tip" aria-hidden="true">{escape(v.tip(c, s))}</span></span></td>'
                 for c, s in v.cats.items())
         rows.append(f"""<tr data-band="{v.band}">
@@ -427,7 +438,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <section class="card" aria-label="Mints" style="overflow:hidden">
 <div class="toolbar"><div role="group" aria-label="Filter by grade" style="display:flex;flex-wrap:wrap;gap:6px">{pill_html}</div>
 <span class="small muted" style="margin-left:auto">* free checks only · — unreachable</span></div>
-<div class="scroll"><table class="mints"><thead><tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
+<div class="scroll"><table class="mints"><thead>{group_row}<tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
 <th scope="col">Last 14 runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
 <span><b style="color:#A32A12">F</b> funds can be forged or stolen</span><span><b style="color:#8A4F00">C</b> funds withheld or privacy broken</span>
@@ -543,7 +554,7 @@ def render_mint(v: MintView, cfg: dict) -> str:
     # passes by category
     groups = []
     for cat in CATEGORIES:
-        rs = [r for r in passes if r.get("category") == cat]
+        rs = [r for r in passes if category_of(r["id"]) == cat]
         if not rs:
             continue
         trs = "".join(f'<tr><td>{escape(r["title"])}</td><td style="width:80px"><span class="tag small" style="white-space:nowrap">'

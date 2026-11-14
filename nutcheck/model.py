@@ -20,10 +20,13 @@ class Severity(str, Enum):
     INFO = "info"
 
 
-CATEGORIES = ["Keys", "Signatures", "Issuing", "Spending", "Locks", "Payouts", "Info"]
+# Free checks first (they cost nothing and run on every mint), then the funded ones.
+FREE_CATEGORIES = ["Keys", "Forgery", "Info"]
+FUNDED_CATEGORIES = ["DLEQ", "Issuing", "Spending", "Locks", "Payouts"]
+CATEGORIES = FREE_CATEGORIES + FUNDED_CATEGORIES
 
 _CATEGORY_RULES = [  # first matching prefix wins
-    ("swap.rejects_forgery", "Signatures"), ("dleq.", "Signatures"),
+    ("swap.rejects_forgery", "Forgery"), ("dleq.", "DLEQ"),
     ("keys.", "Keys"), ("mint.", "Issuing"), ("swap.", "Spending"), ("checkstate.", "Spending"),
     ("p2pk.", "Locks"), ("htlc.", "Locks"), ("locks.", "Locks"), ("melt.", "Payouts"),
     ("info.", "Info"), ("transport.", "Info"),
