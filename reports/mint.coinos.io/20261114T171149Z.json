@@ -1,0 +1,45 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.coinos.io",
+  "slug": "mint.coinos.io",
+  "started": "2026-11-14T17:11:49+00:00",
+  "duration_s": 0.4,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 0,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "nutcheck.inconclusive"
+  ],
+  "spent_sat": 0,
+  "requests": 1,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": null,
+    "version": null,
+    "description": null,
+    "contact": null,
+    "nuts": [],
+    "keysets": []
+  },
+  "results": [
+    {
+      "id": "nutcheck.inconclusive",
+      "title": "Mint answered every request",
+      "nut": "-",
+      "severity": "info",
+      "status": "error",
+      "summary": "Run incomplete: GET /v1/info: HTTP 500. The remaining checks were not run. This is not a mark against the mint; it usually means the mint was busy or limits how fast one client may send requests.",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    }
+  ]
+}

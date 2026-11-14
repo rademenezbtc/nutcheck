@@ -1,0 +1,401 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://testnut.cashu.space",
+  "slug": "testnut.cashu.space",
+  "started": "2026-11-14T17:11:31+00:00",
+  "duration_s": 13.8,
+  "reachable": true,
+  "grade": "B",
+  "partial": false,
+  "reasons": [
+    "Malformed lock (duplicate tag) rejected (medium) \u2192 capped at B"
+  ],
+  "counts": {
+    "pass": 26,
+    "fail": 1,
+    "warn": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "errors": [],
+  "spent_sat": 10,
+  "requests": 41,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Testnut mint",
+    "version": "cdk-mintd/0.18.1",
+    "description": "Mint for testing Cashu wallets",
+    "contact": null,
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "017bc604aaa08e9b58804bdd552286f15d75ebdaa3d1bccc2a52fc7406b4040fda",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      },
+      {
+        "id": "010eca897fd3b9d496c4ef28de870727ef616cb0a05404035c65cf5cc6fa879504",
+        "unit": "usd",
+        "active": true,
+        "input_fee_ppk": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Testnut mint' running cdk-mintd/0.18.1",
+      "funded": false,
+      "evidence": {
+        "name": "Testnut mint",
+        "version": "cdk-mintd/0.18.1",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "64 keys across 2 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "2 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 017bc604aaa0\u2026 fee 100 ppk, usd: 010eca897fd3\u2026 fee 100 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "mint.issue",
+      "title": "Paid quote issues the full amount",
+      "nut": "04",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Paid 64, received 64 in 7 signatures",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    },
+    {
+      "id": "dleq.mint",
+      "title": "DLEQ proofs valid on mint",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "7 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    },
+    {
+      "id": "mint.quote_replay",
+      "title": "Quote cannot be minted twice",
+      "nut": "04",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Second mint on the same quote refused (20002)",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    },
+    {
+      "id": "swap.no_overspend",
+      "title": "Rejects outputs worth more than inputs",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Swap creating 1 sat out of nothing refused (11005)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "swap.fee_exact",
+      "title": "Swap at the advertised fee succeeds",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 inputs, 100 ppk \u2192 1 sat fee, accepted",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "dleq.swap",
+      "title": "DLEQ proofs valid on swap",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "5 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    },
+    {
+      "id": "swap.double_spend",
+      "title": "Rejects double spends",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Re-spending used proofs refused (11001)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "swap.duplicate_input",
+      "title": "Rejects the same proof twice in one request",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Duplicated input refused (11007)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "checkstate.spent",
+      "title": "Spent proofs are reported as spent",
+      "nut": "07",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "All spent proofs report SPENT",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "p2pk.basic",
+      "title": "P2PK lock enforced",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: no signature, empty witness, signature from the wrong key; accepted: signature from the locking key",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.multisig",
+      "title": "P2PK 2-of-2 multisig enforced",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: 1 of 2 signatures, the same key signing twice; accepted: 2 of 2 signatures",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.locktime",
+      "title": "Refund key blocked before locktime",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: refund key before locktime; accepted: locking key",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.refund",
+      "title": "Refund key works after locktime",
+      "nut": "11",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "Refund key spent the expired lock",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.malformed",
+      "title": "Malformed lock (duplicate tag) rejected",
+      "nut": "11",
+      "severity": "medium",
+      "status": "fail",
+      "summary": "Accepted a P2PK secret with two locktime tags. NUT-11 says a duplicated tag makes the secret malformed and it MUST be rejected. Wallets and mints that read different copies of the tag disagree on when the refund key can spend, so a refund could open earlier than the receiver expects.",
+      "funded": true,
+      "evidence": {
+        "exchange": {
+          "method": "POST",
+          "path": "/v1/swap",
+          "status": 200,
+          "request": {
+            "inputs": "[1 proofs, 2 sat]",
+            "outputs": "[1 outputs]"
+          },
+          "response": {
+            "signatures": "[1 signatures]"
+          },
+          "ms": 183
+        }
+      },
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.hashlock",
+      "title": "HTLC hash lock enforced",
+      "nut": "14",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: no preimage, wrong preimage; accepted: correct preimage",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.receiver_sig",
+      "title": "HTLC receiver signature enforced",
+      "nut": "14",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: preimage without the receiver's signature, preimage with the wrong signature; accepted: preimage and receiver signature",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "melt.pays",
+      "title": "Melt pays the invoice",
+      "nut": "05",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Melt state: PAID (fee_reserve 1)",
+      "funded": true,
+      "evidence": {},
+      "category": "Payouts"
+    },
+    {
+      "id": "melt.fee_return",
+      "title": "Overpaid fees are returned",
+      "nut": "08",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Overpaid by 15 sat (internal payment, no Lightning fee); 15 sat returned as change",
+      "funded": true,
+      "evidence": {
+        "fee_reserve": 1,
+        "inputs": 24,
+        "input_fee": 1,
+        "quote_amount": 8,
+        "returned": 15
+      },
+      "category": "Payouts"
+    },
+    {
+      "id": "dleq.melt_change",
+      "title": "DLEQ proofs valid on melt_change",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "4 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    }
+  ]
+}
