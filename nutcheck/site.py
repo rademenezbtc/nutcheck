@@ -363,7 +363,7 @@ table.mints td:last-child,table.mints th:last-child{padding-right:20px;text-alig
 .legend{display:flex;flex-wrap:wrap;gap:20px;align-items:center;padding:14px 20px;border-top:1px solid #E3E3DE;background:#FAFAF8;font-size:13px;color:#4A4F5B}
 .three{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .three .card{padding:20px}.three h2{margin:0 0 8px;font-size:18px}.three p{margin:0;font-size:14px;color:#4A4F5B}
-pre.code,code.block{display:block;background:#15171C;color:#E8E8E3;border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre;margin:0}
+pre.code,code.block{display:block;background:#15171C;color:#E8E8E3;border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}p code{overflow-wrap:anywhere}
 .head{display:flex;flex-wrap:wrap;gap:28px;align-items:center;padding:28px}
 .bigg{width:120px;height:120px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:72px;flex-shrink:0}
 .tag{background:#F1F1EE;border-radius:6px;padding:4px 9px;font-size:13px;color:#3F4450}
@@ -540,9 +540,10 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <span><b style="color:#1F5596">B</b> spec violation, limited impact</span><span><b style="color:#0B5D45">A−</b> warnings only</span></div></section>
 <section class="three">
 <div class="card"><h2>Check it yourself</h2><p style="margin-bottom:12px">Every grade can be reproduced with the same open-source tool, including on a mint you are about to launch.</p>
-<code class="block">uvx --from git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))} \\
+<code class="block" style="font-size:11px;white-space:pre">uvx --from \\
+  git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))} \\
   nutcheck https://your.mint</code>
-<p class="small muted" style="margin:10px 0 0">Or <code>pip install git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))}</code>. Add <code>--free-only</code> to skip the checks that spend a few sats.</p></div>
+<p class="small muted" style="margin:10px 0 0">Add <code>--free-only</code> to skip the checks that spend a few sats. <a href="{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))}#install-and-run">Other ways to install</a></p></div>
 <div class="card"><h2>Evidence, not opinions</h2><p>Each mint page shows the exact request and response behind every failure. Proofs are reduced to counts so published evidence can never be spent.</p></div>
 <div class="card"><h2>Responsible disclosure</h2><p>Critical and high failures are reported to the operator first. Details appear here {cfg['_embargo']} days after the failure was first seen, or once it is fixed.</p></div>
 </section></main>
