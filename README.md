@@ -11,7 +11,9 @@
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
-https://github.com/user-attachments/assets/5e29062d-20ce-4e75-a151-1abe6e1808d2
+
+https://github.com/user-attachments/assets/494a02fa-f229-45a6-a44d-bc99c9bf633f
+
 
 Point NutCheck at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it: the request and response that exposed each failure.
 
