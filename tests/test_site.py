@@ -175,3 +175,13 @@ def test_funded_results_not_carried_across_upgrade(tmp_path):
     upgraded = lambda s, u, w: _free_only(s, u, w, version="Nutshell/0.22.0")
     feed, _ = _feed(tmp_path, [_funded_b, upgraded])
     assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None
+
+
+def test_failed_funding_attempt_stops_carry(tmp_path):
+    def no_invoice(s, u, w):
+        r = _free_only(s, u, w)
+        r["results"][-1].update(status="error", summary="Run incomplete: the mint could not create a Lightning invoice")
+        return r
+    feed, out = _feed(tmp_path, [_funded_b, no_invoice, _free_only])
+    assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None
+    assert "Incomplete: the mint could not create a Lightning invoice" in (out / "index.html").read_text()

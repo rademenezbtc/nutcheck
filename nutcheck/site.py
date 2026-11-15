@@ -206,20 +206,26 @@ def _has_funded(report: dict) -> bool:
     return any(r.get("funded") and r["status"] in ("pass", "fail", "warn") for r in report["results"])
 
 
+def _tried_funded(report: dict) -> bool:
+    return bool(report.get("funding")) or any(r.get("funded") and r["status"] != "skip" for r in report["results"])
+
+
 def with_funded(report: dict, earlier: list[dict]) -> dict:
     """Free-only runs happen more often than funded ones. Combine a free-only run with the most recent
     funded results, so a mint's grade doesn't flip between B and A* depending on which kind ran last.
     Funded results are not carried over a change in the mint's software version: they may no longer hold."""
-    if not report.get("reachable", True) or _has_funded(report):
+    if not report.get("reachable", True) or _tried_funded(report):
         return report
     t = datetime.fromisoformat(report["started"])
     version = report.get("mint_info", {}).get("version")
     for prev in reversed(earlier):
         if t - datetime.fromisoformat(prev["started"]) > timedelta(days=CARRY_FUNDED_DAYS):
             break
-        if not prev.get("reachable", True) or not _has_funded(prev):
+        if not prev.get("reachable", True) or not _tried_funded(prev):
             continue
-        if prev.get("mint_info", {}).get("version") != version:
+        # The most recent attempt at the funded checks decides. If it could not complete them (no invoice,
+        # funding failed), older funded results are not revived: they may come from a since-fixed NutCheck bug.
+        if not _has_funded(prev) or prev.get("mint_info", {}).get("version") != version:
             break
         merged = dict(report)
         merged["results"] = ([r for r in report["results"] if not r.get("funded")]
@@ -334,9 +340,9 @@ table.mints td:last-child,table.mints th:last-child{padding-right:20px;text-alig
 .chip{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;position:relative;cursor:default}
 .chip:focus{outline:2px solid #2E3FB8;outline-offset:2px}
 .tip{display:none;position:fixed;z-index:50;width:max-content;max-width:300px;background:#15171C;color:#F6F6F3;font-size:12.5px;line-height:1.45;font-weight:400;text-align:left;white-space:pre-line;padding:8px 11px;border-radius:8px;box-shadow:0 6px 20px rgba(21,23,28,.18);pointer-events:none}
-.chip:hover .tip,.chip:focus .tip{display:block}
+.chip:hover .tip,.chip:focus .tip,.hb:hover .tip{display:block}
 .chip.p{background:#E7F4EE}.chip.f{background:#FBE3DC}.chip.w{background:#FCEFD6}.chip.s{background:#F1F1EE}
-.hist{display:flex;gap:3px}.hist span{width:8px;height:22px;border-radius:2px}
+.hist{display:flex;gap:3px}.hist>span{width:8px;height:22px;border-radius:2px}
 .withheld{display:inline-flex;gap:8px;align-items:center;background:#F4F4F1;border:1px dashed #C9C9C2;border-radius:8px;padding:8px 12px;font-size:13px;color:#3F4450}
 .legend{display:flex;flex-wrap:wrap;gap:20px;align-items:center;padding:14px 20px;border-top:1px solid #E3E3DE;background:#FAFAF8;font-size:13px;color:#4A4F5B}
 .three{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
@@ -368,7 +374,7 @@ table.checks{width:100%;font-size:14px;margin-bottom:8px}
 table.checks td{padding:10px 8px;border-top:1px solid #F1F1EE;vertical-align:top}
 table.checks td:first-child{padding-left:22px;width:38%;font-weight:500}
 table.checks td:last-child{padding-right:22px;color:#4A4F5B}
-.hgrid{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px}.hgrid span{height:18px;border-radius:3px}
+.hgrid{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));gap:3px}.hgrid>span{height:18px;border-radius:3px}
 ol.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:14px}
 ol.tl li{display:flex;gap:10px}ol.tl i{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0}
 footer{padding:24px 0 48px;font-size:13px;color:#5A5F6B}
@@ -378,6 +384,15 @@ footer{padding:24px 0 48px;font-size:13px;color:#5A5F6B}
 FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
          '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;'
          'family=Space+Grotesk:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">')
+
+
+TIP_JS = """<script>
+document.querySelectorAll('.chip,.hb').forEach(function(c){var t=c.querySelector('.tip');if(!t)return;
+function place(){t.style.display='block';var r=c.getBoundingClientRect(),w=t.offsetWidth,h=t.offsetHeight;
+var left=Math.min(Math.max(8,r.left+r.width/2-w/2),window.innerWidth-w-8);
+var top=r.top-h-8<8?r.bottom+8:r.top-h-8;t.style.left=left+'px';t.style.top=top+'px';t.style.display='';}
+c.addEventListener('mouseenter',place);c.addEventListener('focus',place);});
+</script>"""
 
 
 def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard") -> str:
@@ -398,6 +413,7 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <a class="btn dark" href="{repo}">Test your mint</a></div></header>
 <div class="wrap">{body}</div>
 <footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a> · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
+{TIP_JS}
 </body></html>"""
 
 
@@ -408,12 +424,40 @@ def grade_tile(g: str, cls="gt") -> str:
     return f'<div class="bigg" role="img" aria-label="Grade {escape(g)}" style="background:{bg};color:{fg}">{escape(g)}</div>'
 
 
+def run_tip(v: MintView, r: dict) -> str:
+    """Tooltip for one bar in a grade history: when, the grade, and what went wrong in that run."""
+    head = escape(fmt_time(r["started"]))
+    if not r.get("reachable", True):
+        return f"{head} · didn't answer"
+    lines = [f"{head} · {r['grade']}{'*' if r.get('partial') else ''}"]
+    bad = [x for x in r["results"] if x["status"] in ("fail", "warn")]
+    if v.withheld and any(x["status"] == "fail" and x["severity"] in SEVERE for x in bad):
+        lines.append(f"Serious failure, details withheld until {fmt_day(v.publish_on)}")
+        return "\n".join(lines)
+    seen = []
+    for x in sorted(bad, key=lambda x: (x["status"] != "fail", SEV_ORDER.index(x["severity"]))):
+        line = phrase_for(x) if x["status"] == "fail" else f"Warning: {x['title']}"
+        k = known_issue(v.site_cfg, r, x["id"]) if x["status"] == "fail" else None
+        if k:
+            line += f" ({k.get('label', 'known upstream issue')})"
+        if line not in seen:
+            seen.append(line)
+    errors = [x for x in r["results"] if x["status"] == "error"]
+    if errors:
+        first = errors[0]["summary"].removeprefix("Run incomplete: ").split(". ")[0].rstrip(".")
+        seen.append(f"Incomplete: {first if first[:2].isupper() else _lc(first)}"[:160])
+    elif not seen:
+        seen.append("All checks passed" + (" (free checks only)" if r.get("partial") else ""))
+    return "\n".join(lines + seen)
+
+
 def history_bars(v: MintView, n: int, cls="hist") -> str:
     reps = v.reports[-n:]
     spans = []
     for r in reps:
         g = "—" if not r.get("reachable", True) else r["grade"]
-        spans.append(f'<span style="background:{GRADE_STYLE[base_grade(g)][4]}" title="{escape(fmt_time(r["started"]))}: {escape(g)}"></span>')
+        spans.append(f'<span class="hb" style="background:{GRADE_STYLE[base_grade(g)][4]}">'
+                     f'<span class="tip" aria-hidden="true">{escape(run_tip(v, r))}</span></span>')
     label = "Grades over the last {} runs: {}".format(len(reps), " ".join(
         "—" if not r.get("reachable", True) else r["grade"] for r in reps))
     return f'<div class="{cls}" role="img" aria-label="{escape(label)}">{"".join(spans)}</div>'
@@ -485,11 +529,6 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <div class="card"><h2>Responsible disclosure</h2><p>Critical and high failures are reported to the operator first. Details appear here {cfg['_embargo']} days after the failure was first seen, or once it is fixed.</p></div>
 </section></main>
 <script>
-document.querySelectorAll('.chip').forEach(function(c){{var t=c.querySelector('.tip');if(!t)return;
-function place(){{t.style.display='block';var r=c.getBoundingClientRect(),w=t.offsetWidth,h=t.offsetHeight;
-var left=Math.min(Math.max(8,r.left+r.width/2-w/2),window.innerWidth-w-8);
-var top=r.top-h-8<8?r.bottom+8:r.top-h-8;t.style.left=left+'px';t.style.top=top+'px';t.style.display='';}}
-c.addEventListener('mouseenter',place);c.addEventListener('focus',place);}});
 document.querySelectorAll('.pill').forEach(function(b){{b.addEventListener('click',function(){{
 document.querySelectorAll('.pill').forEach(function(x){{x.setAttribute('aria-pressed',x===b?'true':'false')}});
 var band=b.dataset.band;document.querySelectorAll('tr[data-band]').forEach(function(r){{
@@ -673,7 +712,7 @@ def redacted(report: dict) -> dict:
 def feed(views: list[MintView], base_url: str) -> dict:
     out = []
     for v in views:
-        e = {"url": v.url, "name": v.name, "grade": v.latest["grade"], "partial": v.latest.get("partial", False),
+        e = {"url": v.url, "name": v.name, "grade": v.latest["grade"] if v.latest.get("reachable", True) else None, "partial": v.latest.get("partial", False),
              "reachable": v.latest.get("reachable", True), "tested": v.latest["started"], "funded_tested": v.latest.get("funded_from") or (v.latest["started"] if _has_funded(v.latest) else None), "withheld": v.withheld,
              "page": f"{base_url}mints/{v.slug}.html", "badge": f"{base_url}badge/{v.slug}.svg"}
         if v.withheld:
