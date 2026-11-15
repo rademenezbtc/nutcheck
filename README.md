@@ -149,7 +149,7 @@ nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
-`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed.
+`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners (a push that changes the code or assets just rebuilds the site), keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. For funded checks, store an NWC connection string (send and receive) as the repository secret `NWC_URL`. Only the sweep step can read it, and it never appears in logs or reports. Give NutCheck a wallet that only holds what you're willing to spend.
