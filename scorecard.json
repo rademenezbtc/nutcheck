@@ -5,7 +5,7 @@
   "reports_dir": "data/reports",
   "wallet_dir": "/tmp/nutcheck-wallet",
   "nostr_npub": "npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f",
-  "nostr_relays": ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"],
+  "nostr_relays": ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://ditto.pub/relay", "wss://nostr.mom"],
   "embargo_days": 14,
   "mints": [
     {
