@@ -434,9 +434,9 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <body><header class="top"><div class="wrap">
 <a class="brand disp" href="{root}index.html">{LOGO}<span>{escape(cfg.get('title', 'NutCheck'))}</span></a>
 <nav class="main" aria-label="Main">{links}</nav>
-<a class="btn dark" href="{repo}">Test your mint</a></div></header>
+<a class="btn dark" href="{repo}#install-and-run">Test your mint</a></div></header>
 <div class="wrap">{body}</div>
-<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a>{nostr_link} · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
+<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck for <a href="https://nutnovember.org/">Nut November</a> · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a>{nostr_link} · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
 {TIP_JS}
 </body></html>"""
 
@@ -529,7 +529,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
     body = f"""<main>
 <section class="hero"><div style="flex:999 1 520px;min-width:0">
 <h1>Do Cashu mints follow the rules?</h1>
-<p>NutCheck runs protocol checks against each mint — DLEQ proofs, keyset IDs, P2PK and HTLC locks, double spends, payouts and fee refunds — and grades what it sees, with the evidence.</p>{f'<p style="margin-top:14px"><a href="demo/" style="font-weight:600">▶ Watch the 1-minute demo</a></p>' if cfg.get('_demo') else ''}</div>
+<p>NutCheck runs protocol checks against each mint — DLEQ proofs, keyset IDs, P2PK and HTLC locks, double spends, payouts and fee refunds — and grades what it sees, with the evidence.</p>{hero_links(cfg)}</div>
 <div class="stats"><div class="stat"><b>{n}</b><span class="small muted">mints tested</span></div>
 <div class="stat"><b style="color:#0B5D45">{a}</b><span class="small muted">grade A</span></div>
 <div class="stat"><b style="color:#A32A12">{attn}</b><span class="small muted">need attention</span></div>
@@ -544,7 +544,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
 <span><b style="color:#A32A12">F</b> funds can be forged or stolen</span><span><b style="color:#8A4F00">C</b> funds withheld or privacy broken</span>
 <span><b style="color:#1F5596">B</b> spec violation, limited impact</span><span><b style="color:#0B5D45">A−</b> warnings only</span></div></section>
-<section class="three">
+<section class="three" style="grid-template-columns:repeat(auto-fit,minmax(420px,1fr))">
 <div class="card"><h2>Check it yourself</h2><p style="margin-bottom:12px">Every grade can be reproduced with the same open-source tool, including on a mint you are about to launch.</p>
 <code class="block" style="font-size:11px;white-space:pre">uvx --from \\
   git+{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))} \\
@@ -552,6 +552,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <p class="small muted" style="margin:10px 0 0">Add <code>--free-only</code> to skip the checks that spend a few sats. <a href="{escape(cfg.get('repo_url', 'https://github.com/rademenezbtc/nutcheck'))}#install-and-run">Other ways to install</a></p></div>
 <div class="card"><h2>Evidence, not opinions</h2><p>Each mint page shows the exact request and response behind every failure. Proofs are reduced to counts so published evidence can never be spent.</p></div>
 <div class="card"><h2>Responsible disclosure</h2><p>Critical and high failures are reported to the operator first. Details appear here {cfg['_embargo']} days after the failure was first seen, or once it is fixed.</p></div>
+{nostr_card(cfg)}
 </section></main>
 <script>
 document.querySelectorAll('.pill').forEach(function(b){{b.addEventListener('click',function(){{
@@ -787,6 +788,30 @@ def feed(views: list[MintView], base_url: str) -> dict:
             e["report"] = f"{base_url}reports/{v.slug}.json"
         out.append(e)
     return {"generator": "nutcheck", "mints": out}
+
+
+def _nostr_url(cfg: dict) -> str:
+    return f"https://njump.me/{cfg['nostr_npub']}" if cfg.get("nostr_npub") else ""
+
+
+def hero_links(cfg: dict) -> str:
+    links = []
+    if cfg.get("_demo"):
+        links.append('<a href="demo/" style="font-weight:600">▶ Watch the 1-minute demo</a>')
+    if cfg.get("nostr_npub"):
+        links.append(f'<a href="{escape(_nostr_url(cfg))}" style="font-weight:600">Follow the grades on Nostr</a>')
+    return f'<p style="margin-top:14px">{" · ".join(links)}</p>' if links else ""
+
+
+def nostr_card(cfg: dict) -> str:
+    if not cfg.get("nostr_npub"):
+        return ""
+    host = cfg.get("base_url", "").split("//", 1)[-1].strip("/")
+    who = f'NutCheck\'s key, verified as <code>_@{escape(host)}</code>' if host and "/" not in host else "NutCheck's key"
+    return (f'<div class="card"><h2>Grades on Nostr</h2><p>Every grade is also published as a signed NIP-87 mint review '
+            f'from {who}. Wallets such as cashu.me show it next to the mint, so nobody has to trust this website.</p>'
+            f'<p class="small muted" style="margin:10px 0 0"><a href="{escape(_nostr_url(cfg))}">Follow NutCheck on Nostr</a>'
+            f' · <a href="api/mints.json">JSON feed</a></p></div>')
 
 
 def render_demo(cfg: dict) -> str:
