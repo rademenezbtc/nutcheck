@@ -2,7 +2,7 @@
 
 # NutCheck
 
-**Get your nuts checked.** SSL Labs for Cashu mints.
+**Get your ~~nuts~~ mint checked.** SSL Labs for Cashu mints.
 
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
