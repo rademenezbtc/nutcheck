@@ -94,7 +94,26 @@ Open an [issue](https://github.com/rademenezbtc/nutcheck/issues/new) with your m
 [![NutCheck](https://nutcheck.org/badge/mint.example.com.svg)](https://nutcheck.org/mints/mint.example.com.html)
 ```
 
-Wallets can read every grade from the JSON feed at [`nutcheck.org/api/mints.json`](https://nutcheck.org/api/mints.json).
+Wallets can read every grade from the JSON feed at [`nutcheck.org/api/mints.json`](https://nutcheck.org/api/mints.json), or from Nostr (below).
+
+## Grades on Nostr
+
+After each run NutCheck publishes one signed review per mint as a [NIP-87](https://github.com/nostr-protocol/nips/blob/master/87.md) event (kind 38000), the same kind wallets such as cashu.me and Sovran already read for mint reviews. A wallet can show "NutCheck: B" and link to the evidence without trusting nutcheck.org.
+
+```json
+{"kind": 38000,
+ "content": "[4/5] NutCheck grade B. Accepts P2PK locks with duplicated tags (known CDK issue, fix pending). Evidence: https://nutcheck.org/mints/mint.macadamia.cash.html",
+ "tags": [["d", "<mint pubkey from /v1/info>"], ["k", "38172"], ["u", "https://mint.macadamia.cash", "cashu"],
+          ["rating", "4"], ["grade", "B"], ["r", "https://nutcheck.org/mints/mint.macadamia.cash.html"],
+          ["t", "nutcheck"], ["tested", "2026-11-15T02:24:25+00:00"], ["alt", "NutCheck review of ..."]]}
+```
+
+- **Rating:** A = 5, B = 4, C = 3, D = 2, F = 1. A partial run (*) gets at most 4, since half the mint went untested.
+- **Format:** the content starts with `[n/5]`, as cashu.me writes reviews, and the `rating` tag carries the same number. The extra tags (`grade`, `r`, `tested`) are for clients that want more than stars.
+- **What gets published:** a mint that didn't answer, or whose run broke off, keeps its previous review. During a disclosure embargo the review gives the grade and says details are withheld, exactly like the site.
+- **Relays:** `nostr_relays` in `scorecard.json`. A review is re-sent only when its text changes or the relay's copy is a day old.
+
+To run it on your own scorecard, create a key with `nutcheck nostr keygen`, store the nsec as the repository secret `NOSTR_SECRET_KEY`, and set `nostr_npub` in `scorecard.json`. The site then serves `/.well-known/nostr.json`, so the key verifies as `_@your-domain` (NIP-05).
 
 Funded checks are paid from a small Lightning wallet. Zaps to ⚡ `nutcheck@rizful.com` keep them running.
 
@@ -148,7 +167,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 54 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 58 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -157,7 +176,8 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 
 - **13 Nov:** grading CLI with its own crypto, the naughty proxy and the fault matrix; scorecard site and daily GitHub sweep; first live findings (the duplicate-tag issue, traced to CDK PR #2888 and Nutshell PR #1008); funded checks on live mints over Nostr Wallet Connect.
 - **14 Nov:** rate-limit-safe client after Nutshell's limiter caused false results; encrypted recovery of leftover ecash; scorecard tooltips and known-issue notes; live at [nutcheck.org](https://nutcheck.org); CI running the full suite against a real mint.
-- **Next:** publish signed grades on Nostr (NIP-87 recommendations) so wallets can read them without trusting this website; more mints; NUT-17 and NUT-20 checks.
+- **15 Nov:** free checks every 6 hours, funded daily; grade-history tooltips; signed NIP-87 reviews on Nostr.
+- **Next:** more mints; a GitHub Action for operators; NUT-17 and NUT-20 checks.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.
 

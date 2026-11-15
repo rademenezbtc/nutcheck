@@ -81,7 +81,7 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, pr
         "requests": len(client.log),
         "rate_limited": client.rate_limited,
         "mint_info": {
-            "name": info.get("name"), "version": info.get("version"),
+            "name": info.get("name"), "pubkey": info.get("pubkey"), "version": info.get("version"),
             "description": info.get("description"), "contact": info.get("contact"),
             "nuts": sorted(info.get("nuts", {}), key=lambda x: int(x) if str(x).isdigit() else 999),
             "keysets": [{"id": k.id, "unit": k.unit, "active": k.active, "input_fee_ppk": k.input_fee_ppk}
@@ -229,6 +229,9 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "sweep":
         return cmd_sweep(argv[1:])
+    if argv and argv[0] == "nostr":
+        from .publish import main as nostr_main
+        return nostr_main(argv[1:])
     if argv and argv[0] == "site":
         from .site import cmd_site
         return cmd_site(argv[1:])

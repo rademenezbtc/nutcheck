@@ -86,6 +86,16 @@ jobs:
       - name: Build site
         run: nutcheck site scorecard.json -o _site --alerts alerts.txt
 
+      # Signed NIP-87 reviews (kind 38000), one per mint, so wallets can read grades without trusting
+      # this website. Only changed reviews are re-sent. Never blocks the site: relays come and go.
+      - name: Publish grades on Nostr
+        continue-on-error: true
+        env:
+          NOSTR_SECRET_KEY: ${{ secrets.NOSTR_SECRET_KEY }}
+        run: |
+          if [ -z "$NOSTR_SECRET_KEY" ]; then echo "No NOSTR_SECRET_KEY secret yet: not publishing"; exit 0; fi
+          nutcheck nostr publish scorecard.json
+
       - id: alerts
         name: Collect disclosure alerts
         run: |
@@ -96,7 +106,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3   # v3 keeps dot-folders (.well-known/nostr.json); v4 drops them
         with:
           path: _site
 

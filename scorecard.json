@@ -4,6 +4,7 @@
   "repo_url": "https://github.com/rademenezbtc/nutcheck",
   "reports_dir": "data/reports",
   "wallet_dir": "/tmp/nutcheck-wallet",
+  "nostr_relays": ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"],
   "embargo_days": 14,
   "mints": [
     {

@@ -59,7 +59,8 @@ Live at **https://nutcheck.org**: free checks every 6 hours, funded checks daily
 - **Results (9 live mints + testnut):** A for Chorus, Coinos and Cuba Bitcoin. B for every CDK mint (Minibits, Macadamia, WesternBTC, testnut) and for Voltz (Nutshell 0.20.3), all for accepting duplicated P2PK tags. CDK's fix is in review ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888)); Nutshell fixed it in 0.21.0 ([nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008)). Agorist (Lightning backend can't create invoices) and 8333.space (minting disabled) are free checks only (A*).
 - **Lesson: rate limits create false results.** Nutshell's limiter (20 tx/min, elastic window) turned a funded run into a string of 429s, which early NutCheck read as "refused" (false pass) or "error" (false fail), and stranded 53 sat. Now: 429 and 5xx are *inconclusive*, POSTs are paced at 3.3 s on Nutshell, and leftover ecash is never lost.
 - **Scorecard:** free checks grouped before funded ones, problems in hover tooltips, known upstream issues explained in place with links, badges and a JSON feed.
-- **CI** runs all 54 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
+- **Nostr (15 Nov):** each run publishes one signed NIP-87 review per mint (kind 38000, cashu.me's `[n/5]` format plus a `rating` tag for Sovran; A=5 … F=1, partial runs capped at 4), re-sent only when it changes. Profile and NIP-05 at `_@nutcheck.org`.
+- **CI** runs all 58 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
 
 ## Plan to the 17 Nov show-and-tell
 
@@ -69,7 +70,7 @@ Live at **https://nutcheck.org**: free checks every 6 hours, funded checks daily
 | Fri 13 | ✅ Static scorecard, daily GitHub workflow, first live runs (10 mints, CDK and Nutshell) |
 | Fri 13 | ✅ Funded checks on live mints via Nostr Wallet Connect (leftover sats paid back each run); duplicate-tag issue traced to CDK PR #2888 and Nutshell PR #1008 |
 | Sat 14 | ✅ Rate-limit-safe client, encrypted leftover recovery, scorecard polish, nutcheck.org, CI |
-| Sun 15 | Signed Nostr publishing (event kind and tags to decide, see open questions) |
+| Sun 15 | ✅ Signed Nostr publishing: NIP-87 kind 38000 reviews |
 | Mon 16 | Error-code check, `SIG_ALL` tests, keep testing after a `fee_lie` failure instead of stopping; rehearse the demo |
 | Tue 17 | Show-and-tell: honest mint → A, then flip proxy modes live and watch the grade fall with evidence |
 
@@ -98,7 +99,7 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
 - [ ] Recording of the proxy demo (honest → faults → honest)
 - [x] At least 5 live mints graded with the funded checks (7 so far; the only failure is already public upstream, so nothing to embargo)
-- [ ] Nostr events visible in a client
+- [ ] Nostr events visible in a client (code done; waiting for the NutCheck key)
 - [x] Scorecard page live at nutcheck.org
 - [x] CI running the fault matrix against a real mint
 - [x] This brief updated with what changed

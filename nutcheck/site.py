@@ -172,8 +172,24 @@ class MintView:
     def meta(self) -> str:
         if self.grade == "—":
             return "Unreachable in the last run"
-        partial = " · free checks only" if self.latest.get("partial") else ""
-        return f"{self.software} · {self.fee}{partial}"
+        return f"{self.software} · {self.fee}{self.partial_reason}"
+
+    @property
+    def partial_reason(self) -> str:
+        """Why only part of the suite ran, in a few words."""
+        L = self.latest
+        if not L.get("partial"):
+            return ""
+        errs = {r["id"] for r in L["results"] if r["status"] == "error"}
+        if "nutcheck.inconclusive" in errs:
+            return " · mint returned errors, run incomplete"
+        # A free-only run says nothing about why the paid checks are missing: ask the latest paid attempt.
+        tried = L if _tried_funded(L) else next((r for r in reversed(self.reports) if _tried_funded(r)), None)
+        if tried and any(r["id"] == "mint.quote" and r["status"] == "error" for r in tried["results"]):
+            return " · can't issue ecash, so paid checks can't run"
+        if tried is L:
+            return " · paid checks incomplete"
+        return " · free checks only"
 
     def tip(self, cat: str, state: str) -> str:
         """Tooltip for one category mark: what was checked, and what went wrong if anything."""
@@ -402,6 +418,8 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
            ("run", f"{repo}#install-and-run", "Run it yourself")]
     links = "".join(
         f'<a href="{h}"{" aria-current=page" if k == current else ""}>{t}</a>' for k, h, t in nav)
+    npub = cfg.get("nostr_npub")
+    nostr_link = f' · <a href="https://njump.me/{escape(npub)}">Grades on Nostr</a>' if npub else ""
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(title)}</title>{FONTS}<link rel="stylesheet" href="{root}style.css">
@@ -412,7 +430,7 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <nav class="main" aria-label="Main">{links}</nav>
 <a class="btn dark" href="{repo}">Test your mint</a></div></header>
 <div class="wrap">{body}</div>
-<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a> · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
+<footer class="wrap">Built {escape(cfg['_built'])} by NutCheck · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a>{nostr_link} · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
 {TIP_JS}
 </body></html>"""
 
@@ -514,7 +532,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <span>An A means the mint followed the protocol in our last test. It says nothing about whether the mint holds the bitcoin behind its ecash. For uptime and payout history, see the Cashu round-robin auditor.</span></div>
 <section class="card" aria-label="Mints" style="overflow:hidden">
 <div class="toolbar"><div role="group" aria-label="Filter by grade" style="display:flex;flex-wrap:wrap;gap:6px">{pill_html}</div>
-<span class="small muted" style="margin-left:auto">* free checks only · — unreachable</span></div>
+<span class="small muted" style="margin-left:auto">* only part of the checks ran · — unreachable</span></div>
 <div class="scroll"><table class="mints"><thead>{group_row}<tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
 <th scope="col">Last 14 runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
@@ -750,6 +768,14 @@ def cmd_site(argv) -> int:
         (out / d).mkdir(parents=True)
     (out / "style.css").write_text(CSS)
     (out / "favicon.svg").write_text(FAVICON)
+    logo = base / "assets" / "logo-512.png"
+    if logo.exists():
+        shutil.copyfile(logo, out / "logo.png")
+    if cfg.get("nostr_npub"):  # NIP-05: _@<domain> names NutCheck's Nostr key
+        from .publish import bech32_decode
+        (out / ".well-known").mkdir()
+        (out / ".well-known" / "nostr.json").write_text(
+            json.dumps({"names": {"_": bech32_decode(cfg["nostr_npub"])[1].hex()}}))
     (out / "index.html").write_text(render_index(views, cfg))
     for v in views:
         (out / "mints" / f"{v.slug}.html").write_text(render_mint(v, cfg))
