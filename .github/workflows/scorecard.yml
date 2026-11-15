@@ -102,7 +102,7 @@ jobs:
         run: |
           {
             echo 'text<<NUTCHECK_EOF'
-            cat alerts.txt funding-alerts.txt 2>/dev/null
+            cat alerts.txt funding-alerts.txt 2>/dev/null || true   # funding-alerts.txt only exists after a funded run
             echo 'NUTCHECK_EOF'
           } >> "$GITHUB_OUTPUT"
 
