@@ -564,6 +564,41 @@ def _evidence_tiles(ev: dict) -> str:
     return f'<div class="ev">{tiles}</div>'
 
 
+def _ago(seconds: int) -> str:
+    a = abs(seconds)
+    n, unit = ((a // 86400, "day") if a >= 86400 else (a // 3600, "hour") if a >= 3600
+               else (a // 60, "minute") if a >= 60 else (a, "second"))
+    return f"{n} {unit}{'s' if n != 1 else ''} {'after' if seconds >= 0 else 'before'} the test"
+
+
+def _lock(ev: dict, started: str | None = None) -> str:
+    """Show the lock a mint accepted, one tag per line, with locktimes as dates."""
+    if not ev.get("lock"):
+        return ""
+    try:
+        kind, body = json.loads(ev["lock"])
+    except (ValueError, TypeError):
+        return ""
+    lines = [f'["{kind}", {{', f'  "nonce": "{body.get("nonce", "…")}",', f'  "data": "{body.get("data", "")}",', '  "tags": [']
+    tags = body.get("tags", [])
+    names = [t[0] for t in tags]
+    width = max((len(json.dumps(t)) for t in tags), default=0) + 1
+    for i, t in enumerate(tags):
+        line = ("    " + json.dumps(t) + ("," if i < len(tags) - 1 else "")).ljust(width + 4)
+        note = ""
+        if t[0] == "locktime" and len(t) > 1 and t[1].isdigit():
+            when = datetime.fromtimestamp(int(t[1]), timezone.utc)
+            note = when.strftime("%-d %b, %H:%M UTC")
+            if started:
+                note += f" ({_ago(int((when - datetime.fromisoformat(started)).total_seconds()))})"
+        if names.count(t[0]) > 1:
+            note = (note + " · " if note else "") + "duplicate tag"
+        lines.append(line + (f"   ← {note}" if note else ""))
+    lines += ["  ]", "}]"]
+    return (f'<details class="ex" open><summary>The lock the mint accepted</summary>'
+            f'<pre class="code">{escape(chr(10).join(lines))}</pre></details>')
+
+
 def _known_box(k: dict | None) -> str:
     if not k:
         return ""
@@ -637,7 +672,7 @@ def render_mint(v: MintView, cfg: dict) -> str:
             blocks.append(f"""<div class="fail"><div class="frow"><span class="chip {'f' if r['status']=='fail' else 'w'}">{icon}</span>
 <h3>{escape(r['title'])}</h3><span class="tag small">NUT-{escape(r['nut'])}</span>
 <span class="sev" style="background:{sb};color:{sf}">{escape(r['severity'].capitalize())}{cap}</span></div>
-<p style="margin:0;color:#3F4450">{escape(r['summary'])}</p>{_known_box(known_issue(cfg, L, r['id']))}{_evidence_tiles(r.get('evidence', {}))}{_exchange(r.get('evidence', {}))}</div>""")
+<p style="margin:0;color:#3F4450">{escape(r['summary'])}</p>{_known_box(known_issue(cfg, L, r['id']))}{_evidence_tiles(r.get('evidence', {}))}{_lock(r.get('evidence', {}), r.get('carried_from') or L['started'])}{_exchange(r.get('evidence', {}))}</div>""")
         n_fail = sum(1 for r in fails if r["status"] == "fail")
         n_warn = len(fails) - n_fail
         title = " · ".join(x for x in [f'Failed <span style="color:#A32A12">{n_fail}</span>' if n_fail else "",

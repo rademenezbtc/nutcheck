@@ -182,6 +182,15 @@ def _secret(kind: str, data: str, tags: list[list[str]]) -> str:
     return json.dumps([kind, {"nonce": secrets.token_hex(16), "data": data, "tags": tags}], separators=(",", ":"))
 
 
+def _lock_view(secret: str) -> str:
+    """The lock as evidence: its kind and tags, with the nonce removed and keys shortened.
+    Without the nonce and the mint's signature it identifies and spends nothing."""
+    kind, body = json.loads(secret)
+    short = lambda x: x[:8] + "…" + x[-6:] if len(x) > 20 else x
+    return json.dumps([kind, {"nonce": "…", "data": short(body["data"]),
+                              "tags": [[t[0]] + [short(x) for x in t[1:]] for t in body.get("tags", [])]}])
+
+
 def _witness(sigs: list[str] | None = None, preimage: str | None = None) -> str:
     w = {}
     if preimage is not None:
@@ -254,7 +263,8 @@ def _locks(ctx: Ctx):
                 break  # proof is gone
         if leaked:
             ctx.add(id, title, nut, leak_severity, St.FAIL,
-                    leak_summary or f"Locked ecash was spent with: {leaked[0]}. Anyone could have taken it.")
+                    leak_summary or f"Locked ecash was spent with: {leaked[0]}. Anyone could have taken it.",
+                    lock=_lock_view(proof.secret))
             return
         if accept_case is None:
             ctx.add(id, title, nut, leak_severity, St.PASS, f"Refused: {', '.join(l for l, _ in reject_cases)}")
