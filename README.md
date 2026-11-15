@@ -113,7 +113,9 @@ After each run NutCheck publishes one signed review per mint as a [NIP-87](https
 - **What gets published:** a mint that didn't answer, or whose run broke off, keeps its previous review. During a disclosure embargo the review gives the grade and says details are withheld, exactly like the site.
 - **Relays:** `nostr_relays` in `scorecard.json`. A review is re-sent only when its text changes or the relay's copy is a day old.
 
-To run it on your own scorecard, create a key with `nutcheck nostr keygen`, store the nsec as the repository secret `NOSTR_SECRET_KEY`, and set `nostr_npub` in `scorecard.json`. The site then serves `/.well-known/nostr.json`, so the key verifies as `_@your-domain` (NIP-05).
+NutCheck's profile (name, picture, bio) is managed in a normal Nostr app; `--with-profile` publishes a default one instead.
+
+To run it on your own scorecard, create a key with `nutcheck nostr keygen` (or use one from a Nostr app), store the nsec as the repository secret `NOSTR_SECRET_KEY`, and set `nostr_npub` in `scorecard.json`. The site then serves `/.well-known/nostr.json`, so the key verifies as `_@your-domain` (NIP-05).
 
 Funded checks are paid from a small Lightning wallet. Zaps to ⚡ `nutcheck@rizful.com` keep them running.
 

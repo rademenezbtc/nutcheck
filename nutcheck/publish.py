@@ -12,6 +12,7 @@ four runs a day don't flood relays with identical events.
     nutcheck nostr pubkey                       # npub of $NOSTR_SECRET_KEY
     nutcheck nostr publish scorecard.json       # publish (needs $NOSTR_SECRET_KEY, hex or nsec)
     nutcheck nostr publish scorecard.json --dry-run
+    nutcheck nostr publish scorecard.json --with-profile   # also set the kind 0 profile (normally set in an app)
 """
 from __future__ import annotations
 
@@ -219,6 +220,8 @@ def cmd_publish(argv) -> int:
     ap.add_argument("config")
     ap.add_argument("--dry-run", action="store_true", help="print the events instead of sending them")
     ap.add_argument("--relay", action="append", help="relay URL (repeatable; default from config)")
+    ap.add_argument("--with-profile", action="store_true",
+                    help="also publish NutCheck's kind 0 profile (overwrites a profile edited in a Nostr app)")
     a = ap.parse_args(argv)
     cfg, base = load_config(a.config)
     seckey = _env_key()
@@ -229,12 +232,14 @@ def cmd_publish(argv) -> int:
     now = datetime.now(timezone.utc)
     views = build_views(cfg, base, now, int(cfg.get("embargo_days", 14)))
     t = int(now.timestamp())
-    events = [profile(cfg, seckey, t)] + [review(v, cfg, seckey, t) for v in views if v.reports and publishable(v)]
+    events = [review(v, cfg, seckey, t) for v in views if v.reports and publishable(v)]
+    if a.with_profile:
+        events.insert(0, profile(cfg, seckey, t))
     skipped = [v.url for v in views if v.reports and not publishable(v)]
     if a.dry_run:
         for ev in events:
             print(json.dumps(ev, ensure_ascii=False))
-        print(f"{len(events) - 1} reviews as {npub(pub)}; skipped (no usable result): {', '.join(skipped) or 'none'}",
+        print(f"{sum(e['kind'] == 38000 for e in events)} reviews as {npub(pub)}; skipped (no usable result): {', '.join(skipped) or 'none'}",
               file=sys.stderr)
         return 0
     relays = a.relay or cfg.get("nostr_relays") or DEFAULT_RELAYS
