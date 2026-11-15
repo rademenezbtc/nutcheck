@@ -9,7 +9,7 @@
 
 **Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested every 6 hours, with real sats once a day.
 
-**▶ [Watch the 1-minute demo](https://github.com/user-attachments/assets/5e29062d-20ce-4e75-a151-1abe6e1808d2):** the scorecard, a passing and a failing mint, and proof that NutCheck catches a mint that cheats.
+**▶ [Watch the 1-minute demo](https://github.com/user-attachments/assets/5e29062d-20ce-4e75-a151-1abe6e1808d2):** the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
 Point NutCheck at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it: the request and response that exposed each failure.
 
@@ -149,7 +149,7 @@ nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
-`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners (a push that changes the code or assets just rebuilds the site), keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed.
+`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed. After pushing a change to the site, run the workflow by hand to rebuild it.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. For funded checks, store an NWC connection string (send and receive) as the repository secret `NWC_URL`. Only the sweep step can read it, and it never appears in logs or reports. Give NutCheck a wallet that only holds what you're willing to spend.

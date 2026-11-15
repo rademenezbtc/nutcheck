@@ -793,7 +793,7 @@ def render_demo(cfg: dict) -> str:
     repo = cfg.get("repo_url", "https://github.com/rademenezbtc/nutcheck")
     body = f"""<main style="display:block;padding-top:28px;max-width:1080px;margin:0 auto">
 <h1 style="margin:0 0 8px">NutCheck in one minute</h1>
-<p class="muted" style="margin:0 0 20px">The scorecard, a mint that passes, a mint that fails, and proof that NutCheck catches a mint that cheats.</p>
+<p class="muted" style="margin:0 0 20px">The scorecard, a mint that passes, a mint that fails, and proof that NutCheck spots a mint that breaks the protocol.</p>
 <video controls playsinline preload="metadata" poster="poster.jpg" style="width:100%;border-radius:14px;background:#000;display:block">
 <source src="nutcheck-demo.mp4" type="video/mp4"></video>
 <p style="margin-top:18px"><a href="../index.html">See the live scorecard</a> · <a href="{escape(repo)}">Source on GitHub</a> · <a href="nutcheck-demo.mp4" download>Download the video</a></p>
