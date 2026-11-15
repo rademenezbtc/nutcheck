@@ -416,6 +416,8 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
     nav = [("scorecard", f"{root}index.html", "Scorecard"),
            ("method", f"{repo}#checks", "Methodology"),
            ("run", f"{repo}#install-and-run", "Run it yourself")]
+    if cfg.get("_demo"):
+        nav.insert(1, ("demo", f"{root}demo/", "Demo"))
     links = "".join(
         f'<a href="{h}"{" aria-current=page" if k == current else ""}>{t}</a>' for k, h, t in nav)
     npub = cfg.get("nostr_npub")
@@ -424,7 +426,11 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(title)}</title>{FONTS}<link rel="stylesheet" href="{root}style.css">
 <link rel="icon" type="image/svg+xml" href="{root}favicon.svg">
-<link rel="alternate" type="application/json" href="{root}api/mints.json"></head>
+<link rel="alternate" type="application/json" href="{root}api/mints.json">
+<meta property="og:title" content="{escape(title)}"><meta property="og:site_name" content="NutCheck">
+<meta property="og:description" content="Independent protocol tests for Cashu mints, graded A to F with the evidence.">
+<meta property="og:image" content="{escape(cfg.get('base_url', root))}{'demo/poster.jpg' if cfg.get('_demo') else 'logo.png'}">
+<meta name="twitter:card" content="{'summary_large_image' if cfg.get('_demo') else 'summary'}"></head>
 <body><header class="top"><div class="wrap">
 <a class="brand disp" href="{root}index.html">{LOGO}<span>{escape(cfg.get('title', 'NutCheck'))}</span></a>
 <nav class="main" aria-label="Main">{links}</nav>
@@ -523,7 +529,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
     body = f"""<main>
 <section class="hero"><div style="flex:999 1 520px;min-width:0">
 <h1>Do Cashu mints follow the rules?</h1>
-<p>NutCheck runs protocol checks against each mint — DLEQ proofs, keyset IDs, P2PK and HTLC locks, double spends, payouts and fee refunds — and grades what it sees, with the evidence.</p></div>
+<p>NutCheck runs protocol checks against each mint — DLEQ proofs, keyset IDs, P2PK and HTLC locks, double spends, payouts and fee refunds — and grades what it sees, with the evidence.</p>{f'<p style="margin-top:14px"><a href="demo/" style="font-weight:600">▶ Watch the 1-minute demo</a></p>' if cfg.get('_demo') else ''}</div>
 <div class="stats"><div class="stat"><b>{n}</b><span class="small muted">mints tested</span></div>
 <div class="stat"><b style="color:#0B5D45">{a}</b><span class="small muted">grade A</span></div>
 <div class="stat"><b style="color:#A32A12">{attn}</b><span class="small muted">need attention</span></div>
@@ -783,6 +789,18 @@ def feed(views: list[MintView], base_url: str) -> dict:
     return {"generator": "nutcheck", "mints": out}
 
 
+def render_demo(cfg: dict) -> str:
+    repo = cfg.get("repo_url", "https://github.com/rademenezbtc/nutcheck")
+    body = f"""<main style="display:block;padding-top:28px;max-width:1080px;margin:0 auto">
+<h1 style="margin:0 0 8px">NutCheck in one minute</h1>
+<p class="muted" style="margin:0 0 20px">The scorecard, a mint that passes, a mint that fails, and proof that NutCheck catches a mint that cheats.</p>
+<video controls playsinline preload="metadata" poster="poster.jpg" style="width:100%;border-radius:14px;background:#000;display:block">
+<source src="nutcheck-demo.mp4" type="video/mp4"></video>
+<p style="margin-top:18px"><a href="../index.html">See the live scorecard</a> · <a href="{escape(repo)}">Source on GitHub</a> · <a href="nutcheck-demo.mp4" download>Download the video</a></p>
+</main>"""
+    return page("NutCheck in one minute", body, "../", cfg, "demo")
+
+
 def cmd_site(argv) -> int:
     ap = argparse.ArgumentParser(prog="nutcheck site", description="Build the static scorecard from saved reports.")
     ap.add_argument("config")
@@ -812,6 +830,14 @@ def cmd_site(argv) -> int:
         (out / ".well-known").mkdir()
         (out / ".well-known" / "nostr.json").write_text(
             json.dumps({"names": {"_": bech32_decode(cfg["nostr_npub"])[1].hex()}}))
+    demo = base / cfg.get("demo_dir", "assets/demo")
+    if (demo / "nutcheck-demo.mp4").exists():
+        cfg["_demo"] = True
+        (out / "demo").mkdir()
+        for f in ("nutcheck-demo.mp4", "poster.jpg"):
+            if (demo / f).exists():
+                shutil.copyfile(demo / f, out / "demo" / f)
+        (out / "demo" / "index.html").write_text(render_demo(cfg))
     (out / "index.html").write_text(render_index(views, cfg))
     for v in views:
         (out / "mints" / f"{v.slug}.html").write_text(render_mint(v, cfg))

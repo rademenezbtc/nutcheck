@@ -9,6 +9,8 @@
 
 **Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested every 6 hours, with real sats once a day.
 
+**▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck catches a mint that cheats.
+
 Point NutCheck at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it: the request and response that exposed each failure.
 
 Wallet users get a way to compare mints on something other than uptime. Mint operators get a test they can run before launch and a badge once they pass. Implementers get an independent conformance suite that runs against production.

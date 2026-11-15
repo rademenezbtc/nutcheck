@@ -97,7 +97,7 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
 ## Submission checklist
 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
-- [ ] Recording of the proxy demo (honest → faults → honest)
+- [x] Demo video at https://nutcheck.org/demo/ (scorecard, passing and failing mint, naughty-proxy proof, wallet showing the Nostr review)
 - [x] At least 5 live mints graded with the funded checks (7 so far; the only failure is already public upstream, so nothing to embargo)
 - [x] Nostr events visible in a client (first review seen on relay.primal.net, 15 Nov)
 - [x] Scorecard page live at nutcheck.org
