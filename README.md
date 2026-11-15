@@ -11,9 +11,9 @@
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
-
 https://github.com/user-attachments/assets/494a02fa-f229-45a6-a44d-bc99c9bf633f
 
+[Findings](#what-it-found-on-live-mints) · [Install](#install-and-run) · [Checks](#checks) · [Get listed](#get-your-mint-listed) · [Nostr](#grades-on-nostr) · [How it works](#how-it-works) · [Nut November](#built-for-nut-november-2026)
 
 Point NutCheck at a mint and it checks whether the mint *behaves* as the NUTs require: valid DLEQ proofs, keyset IDs that match their keys, P2PK and HTLC locks actually enforced, double spends refused, payouts that work, overpaid fees returned. You get an A–F grade with the evidence behind it: the request and response that exposed each failure.
 
@@ -22,6 +22,26 @@ Wallet users get a way to compare mints on something other than uptime. Mint ope
 [![The NutCheck scorecard at nutcheck.org](docs/scorecard.png)](https://nutcheck.org)
 
 NutCheck measures behaviour, not solvency. An A means the mint followed the rules in the last test. It says nothing about whether the mint holds the bitcoin backing its ecash, or will still be there tomorrow.
+
+## What it found on live mints
+
+First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22):
+
+| Finding | Mints | Status |
+|---|---|---|
+| **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). CDK keeps the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. | All four CDK mints tested (Minibits, Macadamia, WesternBTC, testnut) | Graded B (medium). Fix in review: [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888) |
+| Same issue in Nutshell before 0.21.0 | Voltz (Nutshell 0.20.3) | Graded B. Fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it |
+| Mint quote fails: the Lightning backend can't create invoices | Agorist | Free checks only (A*), flagged on the scorecard |
+| Minting disabled | 8333.space | Free checks only (A*) |
+| Everything passes, including locks, fee return and DLEQ on change | Chorus, Coinos, Cuba Bitcoin | A |
+
+The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
+
+Lessons for anyone writing a wallet or tool against live mints:
+
+- **Nutshell's rate limiter punishes retries.** Its defaults (20 transactions/min, 60 requests/min per IP) use an elastic window: every request made while limited extends the lockout. NutCheck spaces POSTs about 3.3 s apart on Nutshell, waits 65 s on a 429, and never retries a POST on a 5xx.
+- **A refusal is not proof of correct behaviour.** A 429 or 5xx counts as *inconclusive*, never as "mint refused the bad proof". Every must-refuse test is paired with a must-accept control built the same way, so a mint that refuses everything can't pass.
+- **Error codes differ between implementations,** so NutCheck grades what the mint did (accepted or refused), not which code it returned.
 
 ## Install and run
 
@@ -54,27 +74,7 @@ $ nutcheck https://mint.example.com --json report.json
   53 sat of leftover ecash saved to nutcheck-leftover.token
 ```
 
-A funded run costs about 11–15 sat: input fees, plus 2 sat deliberately burned on a malformed lock. Everything else comes back as a `cashuA` token you can receive into any wallet.
-
-## What it found on live mints
-
-First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22):
-
-| Finding | Mints | Status |
-|---|---|---|
-| **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). CDK keeps the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. | All four CDK mints tested (Minibits, Macadamia, WesternBTC, testnut) | Graded B (medium). Fix in review: [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888) |
-| Same issue in Nutshell before 0.21.0 | Voltz (Nutshell 0.20.3) | Graded B. Fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it |
-| Mint quote fails: the Lightning backend can't create invoices | Agorist | Free checks only (A*), flagged on the scorecard |
-| Minting disabled | 8333.space | Free checks only (A*) |
-| Everything passes, including locks, fee return and DLEQ on change | Chorus, Coinos, Cuba Bitcoin | A |
-
-The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
-
-Lessons for anyone writing a wallet or tool against live mints:
-
-- **Nutshell's rate limiter punishes retries.** Its defaults (20 transactions/min, 60 requests/min per IP) use an elastic window: every request made while limited extends the lockout. NutCheck spaces POSTs about 3.3 s apart on Nutshell, waits 65 s on a 429, and never retries a POST on a 5xx.
-- **A refusal is not proof of correct behaviour.** A 429 or 5xx counts as *inconclusive*, never as "mint refused the bad proof". Every must-refuse test is paired with a must-accept control built the same way, so a mint that refuses everything can't pass.
-- **Error codes differ between implementations,** so NutCheck grades what the mint did (accepted or refused), not which code it returned.
+A funded run costs about 15 sat: input fees and Lightning fees, plus 2 sat deliberately burned on a malformed lock. Everything else comes back as a `cashuA` token you can receive into any wallet.
 
 ## Checks
 
@@ -107,6 +107,10 @@ Wallets can read every grade from the JSON feed at [`nutcheck.org/api/mints.json
 NutCheck's key: [`npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f`](https://njump.me/npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f) (verified as `_@nutcheck.org`).
 
 After each run NutCheck publishes one signed review per mint as a [NIP-87](https://github.com/nostr-protocol/nips/blob/master/87.md) event (kind 38000), the same kind wallets such as cashu.me and Sovran already read for mint reviews. A wallet can show "NutCheck: B" and link to the evidence without trusting nutcheck.org.
+
+![A Cashu wallet's mint page showing NutCheck's 4-star review of Macadamia, read from Nostr](docs/wallet-review.png)
+
+*A Cashu wallet showing NutCheck's review of Macadamia, read straight from Nostr.*
 
 ```json
 {"kind": 38000,
@@ -186,7 +190,7 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 
 - **13 Nov:** grading CLI with its own crypto, the naughty proxy and the fault matrix; scorecard site and daily GitHub sweep; first live findings (the duplicate-tag issue, traced to CDK PR #2888 and Nutshell PR #1008); funded checks on live mints over Nostr Wallet Connect.
 - **14 Nov:** rate-limit-safe client after Nutshell's limiter caused false results; encrypted recovery of leftover ecash; scorecard tooltips and known-issue notes; live at [nutcheck.org](https://nutcheck.org); CI running the full suite against a real mint.
-- **15 Nov:** free checks every 6 hours, funded daily; grade-history tooltips; signed NIP-87 reviews on Nostr.
+- **15 Nov:** free checks every 6 hours, funded daily; signed NIP-87 reviews on Nostr, already shown in a Cashu wallet; mint pages show the exact lock a mint accepted; sweeps that survive a crash without losing ecash; grade-history tooltips; the [1-minute demo](https://nutcheck.org/demo/).
 - **Next:** more mints; a GitHub Action for operators; NUT-17 and NUT-20 checks.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.
