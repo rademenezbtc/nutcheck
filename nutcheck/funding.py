@@ -85,8 +85,10 @@ class Funder:
                     self.stash(wallet, label)  # change too small to pay back: reused next run, not lost
                     out["change_kept"] = wallet.balance
                 return out
-            except _RETRYABLE as e:
+            except Exception as e:  # noqa: BLE001  any failure here must end in a stash, never in lost sats
                 last = e
+                if not isinstance(e, _RETRYABLE):
+                    break  # a bug, not a busy mint: retrying won't help
         out["ok"] = False
         why = f"{label}: pay-back failed after {len(self.retry_waits) + 1} attempts ({last})"
         if stash_on_failure and self.stash_dir:

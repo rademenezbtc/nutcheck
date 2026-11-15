@@ -60,7 +60,7 @@ Live at **https://nutcheck.org**: free checks every 6 hours, funded checks daily
 - **Lesson: rate limits create false results.** Nutshell's limiter (20 tx/min, elastic window) turned a funded run into a string of 429s, which early NutCheck read as "refused" (false pass) or "error" (false fail), and stranded 53 sat. Now: 429 and 5xx are *inconclusive*, POSTs are paced at 3.3 s on Nutshell, and leftover ecash is never lost.
 - **Scorecard:** free checks grouped before funded ones, problems in hover tooltips, known upstream issues explained in place with links, badges and a JSON feed.
 - **Nostr (15 Nov):** each run publishes one signed NIP-87 review per mint (kind 38000, cashu.me's `[n/5]` format plus a `rating` tag for Sovran; A=5 … F=1, partial runs capped at 4), re-sent only when it changes. Profile and NIP-05 at `_@nutcheck.org`.
-- **CI** runs all 58 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
+- **CI** runs all 60 tests on every push, including the full fault matrix against a real Nutshell mint behind the naughty proxy.
 
 ## Plan to the 17 Nov show-and-tell
 
@@ -99,7 +99,7 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
 - [ ] Recording of the proxy demo (honest → faults → honest)
 - [x] At least 5 live mints graded with the funded checks (7 so far; the only failure is already public upstream, so nothing to embargo)
-- [ ] Nostr events visible in a client (key npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f set up 15 Nov)
+- [x] Nostr events visible in a client (first review seen on relay.primal.net, 15 Nov)
 - [x] Scorecard page live at nutcheck.org
 - [x] CI running the fault matrix against a real mint
 - [x] This brief updated with what changed

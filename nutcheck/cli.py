@@ -190,6 +190,7 @@ def cmd_sweep(argv):
             print(f"stash: {line}")
             if "recovered" not in line and "nothing left" not in line:
                 funder.alerts.append(f"stash: {line}")
+    crashed: list[str] = []
     for m in cfg["mints"]:
         slug = mint_slug(m["url"])
         if a.only and slug not in a.only:
@@ -204,14 +205,29 @@ def cmd_sweep(argv):
         on_invoice = pay or (lambda inv, amt, s=slug: print(f"  [{s}] invoice for {amt} sat not paid automatically", flush=True))
         preload = funder.take_stash(m["url"]) if (funder and mode == "nwc") else []
         paid_before = funder.paid_out if funder else 0
-        report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
-                               on_invoice=on_invoice, preload=preload)
-        if funder and mode == "nwc":  # never pay a test mint's fake ecash back into the real wallet
-            paid_in = funder.paid_out - paid_before
-            report["funding"] = {"source": "nwc", "paid_in": paid_in, "funded": paid_in > 0,
-                                 "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}
-        path = save_report(report, reports_dir)
-        save_leftover(wallet, wallet_dir / f"{slug}.tokens")
+        wallet = None
+        try:
+            report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
+                                   on_invoice=on_invoice, preload=preload)
+            if funder and mode == "nwc":  # never pay a test mint's fake ecash back into the real wallet
+                paid_in = funder.paid_out - paid_before
+                report["funding"] = {"source": "nwc", "paid_in": paid_in, "funded": paid_in > 0,
+                                     "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}
+            path = save_report(report, reports_dir)
+            save_leftover(wallet, wallet_dir / f"{slug}.tokens")
+        except Exception as e:  # noqa: BLE001  one mint must never stop the sweep or lose its ecash
+            traceback.print_exc()
+            note = f"{slug}: NutCheck crashed ({type(e).__name__}: {e})"
+            if funder and mode == "nwc" and wallet is not None and wallet.proofs and funder.stash_dir:
+                try:
+                    note += f"; {wallet.balance} sat stashed in {funder.stash(wallet, slug).name}"
+                except Exception as e2:  # noqa: BLE001
+                    note += f"; could not stash {wallet.balance} sat ({e2})"
+            print(f"ERR {slug:<40} {note}")
+            if funder:
+                funder.alerts.append(note)
+            crashed.append(slug)
+            continue
         fund_note = ""
         if report.get("funding"):
             f = report["funding"]
@@ -222,6 +238,8 @@ def cmd_sweep(argv):
               + (f"; funding stopped: {funder.stopped}" if funder.stopped else ""))
         if a.funding_alerts:
             Path(a.funding_alerts).write_text("".join(f"Funding: {x}\n" for x in funder.alerts))
+    if crashed:
+        print(f"::warning::NutCheck crashed on {', '.join(crashed)}; the other mints were tested and saved")
     return 0
 
 

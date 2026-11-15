@@ -74,6 +74,7 @@ jobs:
           nutcheck sweep scorecard.json "${args[@]}"
 
       - name: Save reports
+        if: ${{ !cancelled() }}   # keep finished reports and stashed ecash even if the sweep failed
         run: |
           cd data
           git add -A reports

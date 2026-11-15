@@ -92,3 +92,45 @@ def test_test_mint_never_touches_the_real_wallet(tmp_path, monkeypatch):
         (rep,), _ = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": True, "wait": 20}])
     assert w.paid == [] and w.invoices == [], "fake-Lightning mints must not pay into or out of the wallet"
     assert "funding" not in rep and not rep["partial"]
+
+
+def test_unexpected_crash_stashes_ecash_and_sweep_goes_on(tmp_path, monkeypatch):
+    """A bug while paying back (not a busy mint) must end in a stash, and later mints must still be tested."""
+    from nutcheck import funding
+    real = funding.Funder._melt_back
+    calls = []
+
+    def broken_once(self, wallet, label):
+        calls.append(label)
+        if len(calls) == 1:
+            raise KeyError("unexpected field in melt quote")
+        return real(self, wallet, label)
+
+    monkeypatch.setattr(funding.Funder, "_melt_back", broken_once)
+    cfg_extra = {"stash_dir": "stash"}
+    with FakeRelayWallet(7706, proxy_url=PROXY, mint_url=MINT) as w:
+        cfg = {"reports_dir": "reports", "wallet_dir": "wallet", "nwc_max_sat_per_run": 1000, **cfg_extra,
+               "mints": [{"url": PROXY, "funded": "nwc", "wait": 20}, {"url": MINT}]}
+        (tmp_path / "sc.json").write_text(json.dumps(cfg))
+        monkeypatch.setenv("NWC_URL", w.uri)
+        assert cmd_sweep([str(tmp_path / "sc.json"), "--nwc"]) == 0
+    reps = {json.loads(p.read_text())["mint"]: json.loads(p.read_text()) for p in (tmp_path / "reports").rglob("*.json")}
+    assert reps[PROXY]["funding"]["ok"] is False and reps[PROXY]["funding"]["stashed"] is True
+    assert list((tmp_path / "stash").glob("*.nutstash")), "leftover ecash kept, encrypted"
+    assert MINT in reps, "the next mint was still tested"
+
+
+def test_crash_outside_the_checks_does_not_stop_the_sweep(tmp_path, monkeypatch):
+    from nutcheck import cli
+    real = cli.save_report
+
+    def flaky(report, d):
+        if report["mint"] == PROXY:
+            raise OSError("disk full")
+        return real(report, d)
+
+    monkeypatch.setattr(cli, "save_report", flaky)
+    (tmp_path / "sc.json").write_text(json.dumps({"reports_dir": "reports", "wallet_dir": "wallet",
+                                                  "mints": [{"url": PROXY}, {"url": MINT}]}))
+    assert cmd_sweep([str(tmp_path / "sc.json")]) == 0
+    assert [json.loads(p.read_text())["mint"] for p in (tmp_path / "reports").rglob("*.json")] == [MINT]
