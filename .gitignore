@@ -16,3 +16,4 @@ demo/*.log
 /_site/
 /alerts.txt
 /funding-alerts.txt
+.DS_Store
