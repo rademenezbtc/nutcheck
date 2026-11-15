@@ -99,7 +99,7 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
 - [ ] Recording of the proxy demo (honest → faults → honest)
 - [x] At least 5 live mints graded with the funded checks (7 so far; the only failure is already public upstream, so nothing to embargo)
-- [ ] Nostr events visible in a client (code done; waiting for the NutCheck key)
+- [ ] Nostr events visible in a client (key npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f set up 15 Nov)
 - [x] Scorecard page live at nutcheck.org
 - [x] CI running the fault matrix against a real mint
 - [x] This brief updated with what changed

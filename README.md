@@ -98,6 +98,8 @@ Wallets can read every grade from the JSON feed at [`nutcheck.org/api/mints.json
 
 ## Grades on Nostr
 
+NutCheck's key: [`npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f`](https://njump.me/npub1dx2xvhnzc7d6me2p0fgvkj22pht034qtc5eju72p2wpttvl83g0qgquc2f) (verified as `_@nutcheck.org`).
+
 After each run NutCheck publishes one signed review per mint as a [NIP-87](https://github.com/nostr-protocol/nips/blob/master/87.md) event (kind 38000), the same kind wallets such as cashu.me and Sovran already read for mint reviews. A wallet can show "NutCheck: B" and link to the evidence without trusting nutcheck.org.
 
 ```json
