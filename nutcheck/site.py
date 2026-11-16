@@ -292,10 +292,10 @@ def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list
 # ---- HTML ---------------------------------------------------------------------------------------
 
 ICONS = {
-    "p": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.3l2.6 2.6L11 4.4" fill="none" stroke="#0B5D45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    "f": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 4l6 6M10 4l-6 6" fill="none" stroke="#A32A12" stroke-width="2" stroke-linecap="round"/></svg>',
-    "w": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 3.5v4.5M7 10.4v.1" fill="none" stroke="#8A4F00" stroke-width="2" stroke-linecap="round"/></svg>',
-    "s": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 7h6" fill="none" stroke="#8A8F99" stroke-width="2" stroke-linecap="round"/></svg>',
+    "p": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.3l2.6 2.6L11 4.4" fill="none" style="stroke:#0B5D45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    "f": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 4l6 6M10 4l-6 6" fill="none" style="stroke:#A32A12" stroke-width="2" stroke-linecap="round"/></svg>',
+    "w": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 3.5v4.5M7 10.4v.1" fill="none" style="stroke:#8A4F00" stroke-width="2" stroke-linecap="round"/></svg>',
+    "s": '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 7h6" fill="none" style="stroke:#8A8F99" stroke-width="2" stroke-linecap="round"/></svg>',
 }
 LOCK = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="6" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
 LOGO = ('<svg width="36" height="36" viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-28 58 60)">'
@@ -411,6 +411,86 @@ c.addEventListener('mouseenter',place);c.addEventListener('focus',place);});
 </script>"""
 
 
+# ---- dark theme ("Roasted"): every light colour has a dark counterpart -----------------------------
+DARK = {
+    "#F6F6F3": "#16120E", "#fff": "#1F1A15", "#FAFAF8": "#231D17", "#F4F4F1": "#251F19", "#F1F1EE": "#28221B",
+    "#ECECE7": "#2D261F", "#E8E8E3": "#302921", "#E3E3DE": "#352D25", "#E2E2DC": "#372F27", "#D9D9D3": "#41382E",
+    "#D6D6D0": "#433A30", "#C9C9C2": "#504539",
+    "#15171C": "#F3ECE2", "#2A2D35": "#E3D9CB", "#3F4450": "#CDC1B1", "#4A4F5B": "#BFB2A1", "#5A5F6B": "#A69885",
+    "#8A8F99": "#807464",
+    "#2E3FB8": "#E9B666", "#1F2C8A": "#F5D093", "#EEF0FB": "#35291A", "#CBD1F2": "#5C4627", "#22306E": "#F5DCAE",
+    "#0E7A5A": "#2E9E78", "#DDF1E8": "#18302A", "#E7F4EE": "#162A23", "#0B5D45": "#82DDB8", "#2E9E78": "#3DB48B",
+    "#2563A8": "#4A86C8", "#E1ECF8": "#1B2638", "#1F5596": "#A2C6F1", "#4D86C6": "#5E97D6",
+    "#A85E00": "#C9861E", "#FBEBD0": "#36280F", "#FCEFD6": "#30240F", "#8A4F00": "#F4BF6B", "#D39A3A": "#DDA84D",
+    "#C98A3E": "#D09A4C",
+    "#B8321A": "#D2513A", "#F9DDD6": "#3C1D16", "#FBE3DC": "#361A13", "#A32A12": "#FFA48F", "#D2553B": "#E2735A",
+    "#FFF8E6": "#2C2210", "#F0DDA8": "#4E3E1A", "#4D3A00": "#F4D892",
+}
+_HEX = re.compile(r"#[0-9A-Fa-f]{6}\b|#fff\b")
+
+
+def _dark(h: str) -> str | None:
+    return DARK["#fff"] if h.lower() == "#fff" else DARK.get(h.upper())
+
+
+def _scope(css: str, prefix: str) -> str:
+    """Re-emit only the colour declarations of `css`, each rule under `prefix`, with dark colours."""
+    out, i = [], 0
+    while i < len(css):
+        j = css.find("{", i)
+        if j < 0:
+            break
+        head = css[i:j].strip()
+        if head.startswith("@media"):
+            depth, k = 1, j + 1
+            while depth:
+                depth += {"{": 1, "}": -1}.get(css[k], 0)
+                k += 1
+            inner = _scope(css[j + 1:k - 1], prefix)
+            if inner:
+                out.append(f"{head}{{{inner}}}")
+            i = k
+            continue
+        k = css.find("}", j)
+        decls = [d for d in css[j + 1:k].split(";") if _HEX.search(d) and all(_dark(h) for h in _HEX.findall(d))]
+        if decls:
+            sels = ",".join(f"{prefix} {sel.strip()}" for sel in head.split(","))
+            out.append(sels + "{" + ";".join(_HEX.sub(lambda m: _dark(m.group(0)), d) for d in decls) + "}")
+        i = k + 1
+    return "".join(out)
+
+
+def dark_css(css: str) -> str:
+    vars_ = ";".join(f"--c{h.lstrip('#').upper()}:{v}" for h, v in DARK.items() if h != "#fff")
+    d = "html[data-theme=dark]"
+    rules = _scope(css, d) + (f"{d} pre.code,{d} code.block{{background:#0E0B08;color:#EAE2D6;border:1px solid #352D25}}"
+                              f"{d} details.ex pre{{border-width:1px 0 0}}")
+    toggle = (".theme{border:1px solid #E3E3DE;background:none;border-radius:10px;width:44px;height:44px;cursor:pointer;"
+              "color:inherit;display:inline-flex;align-items:center;justify-content:center}"
+              ".theme svg{width:20px;height:20px}.theme .sun{display:none}"
+              "html[data-theme=dark] .theme .sun{display:block}html[data-theme=dark] .theme .moon{display:none}"
+              "html[data-theme=dark] .theme{border-color:#352D25}")
+    return (f"html[data-theme=dark]{{color-scheme:dark;{vars_}}}\n{rules}\n{toggle}\n"
+            "/* without JavaScript, follow the device setting */\n"
+            f"@media (prefers-color-scheme:dark){{html:not([data-theme]){{color-scheme:dark;{vars_}}}"
+            f"{_scope(css, 'html:not([data-theme])')}}}")
+
+
+def themable(html: str) -> str:
+    """Inline colours become CSS variables, so the dark theme can recolour them too."""
+    def fix(m):
+        return 'style="' + _HEX.sub(lambda k: (f"var(--c{k.group(0)[1:].upper()},{k.group(0)})"
+                                               if k.group(0).lower() != "#fff" and _dark(k.group(0)) else k.group(0)),
+                                    m.group(1)) + '"'
+    return re.sub(r'style="([^"]*)"', fix, html)
+
+
+THEME_HEAD = """<script>(function(){var t;try{t=localStorage.getItem('theme')}catch(e){}
+if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+document.documentElement.dataset.theme=t})()</script>"""
+THEME_BUTTON = """<button class="theme" type="button" aria-label="Switch between light and dark theme" onclick="(function(){var r=document.documentElement,t=r.dataset.theme==='dark'?'light':'dark';r.dataset.theme=t;try{localStorage.setItem('theme',t)}catch(e){}})()"><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>"""
+
+
 def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard") -> str:
     repo = cfg.get("repo_url", "https://github.com/rademenezbtc/nutcheck")
     nav = [("scorecard", f"{root}index.html", "Scorecard"),
@@ -422,9 +502,9 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
         f'<a href="{h}"{" aria-current=page" if k == current else ""}>{t}</a>' for k, h, t in nav)
     npub = cfg.get("nostr_npub")
     nostr_link = f' · <a href="https://njump.me/{escape(npub)}">Grades on Nostr</a>' if npub else ""
-    return f"""<!doctype html>
+    return themable(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escape(title)}</title>{FONTS}<link rel="stylesheet" href="{root}style.css">
+<title>{escape(title)}</title>{THEME_HEAD}{FONTS}<link rel="stylesheet" href="{root}style.css">
 <link rel="icon" type="image/svg+xml" href="{root}favicon.svg">
 <link rel="alternate" type="application/json" href="{root}api/mints.json">
 <meta property="og:title" content="{escape(title)}"><meta property="og:site_name" content="NutCheck">
@@ -434,11 +514,11 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <body><header class="top"><div class="wrap">
 <a class="brand disp" href="{root}index.html">{LOGO}<span>{escape(cfg.get('title', 'NutCheck'))}</span></a>
 <nav class="main" aria-label="Main">{links}</nav>
-<a class="btn dark" href="{repo}#install-and-run">Test your mint</a></div></header>
+{THEME_BUTTON}<a class="btn dark" href="{repo}#install-and-run">Test your mint</a></div></header>
 <div class="wrap">{body}</div>
 <footer class="wrap">Built {escape(cfg['_built'])} by NutCheck for <a href="https://nutnovember.org/">Nut November</a> · open source, MIT · <a href="{repo}">GitHub</a> · <a href="{repo}#get-your-mint-listed">Get your mint listed</a> · <a href="{root}api/mints.json">JSON feed</a>{nostr_link} · ⚡ <a href="lightning:{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}">{escape(cfg.get('lightning', 'nutcheck@rizful.com'))}</a> keeps the funded checks running</footer>
 {TIP_JS}
-</body></html>"""
+</body></html>""")
 
 
 def grade_tile(g: str, cls="gt") -> str:
@@ -845,7 +925,7 @@ def cmd_site(argv) -> int:
         shutil.rmtree(out)
     for d in ("mints", "badge", "reports", "api"):
         (out / d).mkdir(parents=True)
-    (out / "style.css").write_text(CSS)
+    (out / "style.css").write_text(CSS + "\n" + dark_css(CSS))
     (out / "favicon.svg").write_text(FAVICON)
     logo = base / "assets" / "logo-512.png"
     if logo.exists():
