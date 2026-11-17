@@ -29,7 +29,7 @@ First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22):
 
 | Finding | Mints | Status |
 |---|---|---|
-| **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). CDK keeps the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. | All four CDK mints tested (Minibits, Macadamia, WesternBTC, testnut) | Graded B (medium). Fix in review: [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888) |
+| **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). CDK keeps the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. | All four CDK mints tested (Minibits, Macadamia, WesternBTC, testnut) | Graded B (medium). **Fix merged 16 Nov:** [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it |
 | Same issue in Nutshell before 0.21.0 | Voltz (Nutshell 0.20.3) | Graded B. Fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it |
 | Mint quote fails: the Lightning backend can't create invoices | Agorist | Free checks only (A*), flagged on the scorecard |
 | Minting disabled | 8333.space | Free checks only (A*) |
@@ -114,7 +114,7 @@ After each run NutCheck publishes one signed review per mint as a [NIP-87](https
 
 ```json
 {"kind": 38000,
- "content": "[4/5] NutCheck grade B. Accepts P2PK locks with duplicated tags (known CDK issue, fix pending). Evidence: https://nutcheck.org/mints/mint.macadamia.cash.html",
+ "content": "[4/5] NutCheck grade B. Accepts P2PK locks with duplicated tags (CDK fix merged, upgrade when released). Evidence: https://nutcheck.org/mints/mint.macadamia.cash.html",
  "tags": [["d", "<mint pubkey from /v1/info>"], ["k", "38172"], ["u", "https://mint.macadamia.cash", "cashu"],
           ["rating", "4"], ["grade", "B"], ["r", "https://nutcheck.org/mints/mint.macadamia.cash.html"],
           ["t", "nutcheck"], ["tested", "2026-11-15T02:24:25+00:00"], ["alt", "NutCheck review of ..."]]}
@@ -191,6 +191,7 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **13 Nov:** grading CLI with its own crypto, the naughty proxy and the fault matrix; scorecard site and daily GitHub sweep; first live findings (the duplicate-tag issue, traced to CDK PR #2888 and Nutshell PR #1008); funded checks on live mints over Nostr Wallet Connect.
 - **14 Nov:** rate-limit-safe client after Nutshell's limiter caused false results; encrypted recovery of leftover ecash; scorecard tooltips and known-issue notes; live at [nutcheck.org](https://nutcheck.org); CI running the full suite against a real mint.
 - **15 Nov:** free checks every 6 hours, funded daily; signed NIP-87 reviews on Nostr, already shown in a Cashu wallet; mint pages show the exact lock a mint accepted; sweeps that survive a crash without losing ecash; grade-history tooltips; the [1-minute demo](https://nutcheck.org/demo/).
+- **16 Nov:** CDK merged the fix for the duplicate-tag issue ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888) by robwoodgate), three days after NutCheck posted evidence that every CDK mint it tests is affected.
 - **Next:** more mints; a GitHub Action for operators; NUT-17 and NUT-20 checks.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.

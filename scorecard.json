@@ -54,10 +54,10 @@
     {
       "check": "p2pk.malformed",
       "software": "cdk-mintd",
-      "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. The fix is in review upstream; mints pass once they run a CDK release that includes it.",
+      "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. The fix was merged upstream on 16 Nov 2026; mints pass once they run a CDK release that includes it.",
       "url": "https://github.com/cashubtc/cdk/pull/2888",
       "link_text": "CDK PR #2888",
-      "label": "known CDK issue, fix pending"
+      "label": "CDK fix merged, upgrade when released"
     },
     {
       "check": "p2pk.malformed",
