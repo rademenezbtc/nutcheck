@@ -135,7 +135,7 @@ def profile(cfg: dict, seckey: int, created_at: int | None = None) -> dict:
     base = cfg.get("base_url", "https://nutcheck.org/")
     meta = {"name": "NutCheck", "display_name": "NutCheck",
             "about": ("Independent protocol tests for Cashu mints: DLEQ proofs, keyset IDs, P2PK/HTLC locks, "
-                      "double spends, payouts and fee refunds. Grades A–F with evidence, re-tested every 6 hours. "
+                      "double spends, payouts and fee refunds. Grades A–F with evidence, re-tested daily. "
                       "Reviews are NIP-87 events: A = 5/5, B = 4, C = 3, D = 2, F = 1; a partial run (*) gets at most 4. "
                       "Measures behaviour, not solvency."),
             "picture": base + "logo.png", "website": base,

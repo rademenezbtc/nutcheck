@@ -7,7 +7,7 @@
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
 
-**Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested every 6 hours, with real sats once a day.
+**Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested daily, with real sats.
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
@@ -155,17 +155,17 @@ nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
-`.github/workflows/scorecard.yml` runs the free checks every 6 hours and the funded checks daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed. After pushing a change to the site, run the workflow by hand to rebuild it.
+`.github/workflows/scorecard.yml` runs every check, free and funded, daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed. After pushing a change to the site, run the workflow by hand to rebuild it.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. For funded checks, store an NWC connection string (send and receive) as the repository secret `NWC_URL`. Only the sweep step can read it, and it never appears in logs or reports. Give NutCheck a wallet that only holds what you're willing to spend.
-3. **Actions → Scorecard → Run workflow** for the first run. Tick **funded** to run the paid checks now (they otherwise run daily at 05:17 UTC), and optionally name one mint under **only**.
+3. **Actions → Scorecard → Run workflow** for the first run. Tick **funded** to run the paid checks too (the daily 05:17 UTC run always does; leave it unticked for a quick site rebuild), and optionally name one mint under **only**.
 4. Optional: a custom domain (Settings → Pages → Custom domain; set `base_url` in `scorecard.json` to match).
 
 **When the run fails with "NutCheck needs your attention",** either NutCheck found a critical or high failure, or funding went wrong. GitHub emails you about the failed run, and the run summary says which. For a mint failure, contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
 
 Notes:
-- Between funded runs, a mint's page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so grades don't flip between B and A* every 6 hours.
+- If a run can't fund a mint (or a manual run skips the paid checks), its page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so grades don't flip between B and A*.
 - `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run every time, for free.
 - An unresolved serious failure fails every run, so GitHub emails you up to 4 times a day until you set `"notified"`.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count. If the workflow ever shows as disabled, re-enable it in the Actions tab.

@@ -53,7 +53,7 @@ The scorecard went live at https://rademenezbtc.github.io/nutcheck/ (now https:/
 
 ## Status (14 Nov)
 
-Live at **https://nutcheck.org**: free checks every 6 hours, funded checks daily.
+Live at **https://nutcheck.org**: all checks, free and funded, once a day.
 
 - **Funded checks on live mints work.** A Rizful wallet over Nostr Wallet Connect pays each mint's 64-sat invoice; NutCheck runs the funded checks and melts the rest back. About 15 sat per mint per run. Leftovers that can't be paid back are stored NIP-44-encrypted on the `data` branch and recovered next run.
 - **Results (9 live mints + testnut):** A for Chorus, Coinos and Cuba Bitcoin. B for every CDK mint (Minibits, Macadamia, WesternBTC, testnut) and for Voltz (Nutshell 0.20.3), all for accepting duplicated P2PK tags. CDK's fix was merged on 16 Nov ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888)); Nutshell fixed it in 0.21.0 ([nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008)). Agorist (Lightning backend can't create invoices) and 8333.space (minting disabled) are free checks only (A*).
