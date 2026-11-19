@@ -1,0 +1,205 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://8333.space:3338",
+  "slug": "8333.space_3338",
+  "started": "2026-11-19T14:29:35+00:00",
+  "duration_s": 5.1,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 8,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "mint.quote"
+  ],
+  "spent_sat": 0,
+  "requests": 8,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Cashu test mint",
+    "pubkey": "03e3d23e1b66eadaf15ce0d640a908e8ba1984baed34ab98c547aab4cf4249440d",
+    "version": "Nutshell/0.20.3.1",
+    "description": "This mint is for testing and development purposes only. Do not use this mint as a default mint in your application! Please use it with caution and only with very small amounts. Your Cashu client could have bugs. Accidents and bugs can lead to loss of funds for which we are not responsible for.",
+    "contact": [],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "00d4cde34fada3fd",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      },
+      {
+        "id": "000c40f3eaaba9f1",
+        "unit": "msat",
+        "active": true,
+        "input_fee_ppk": 100
+      },
+      {
+        "id": "0013f7fd12c87777",
+        "unit": "usd",
+        "active": true,
+        "input_fee_ppk": 100
+      },
+      {
+        "id": "01b4c53209f2a97257e1a1279c78c69419fe5d0cc87fdb7a0069060f43b3cee318",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Cashu test mint' running Nutshell/0.20.3.1",
+      "funded": false,
+      "evidence": {
+        "name": "Cashu test mint",
+        "version": "Nutshell/0.20.3.1",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "256 keys across 4 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "4 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 00d4cde34fad\u2026 fee 100 ppk, msat: 000c40f3eaab\u2026 fee 100 ppk, usd: 0013f7fd12c8\u2026 fee 100 ppk, sat: 01b4c53209f2\u2026 fee 100 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "mint.quote",
+      "title": "Mint quote issued",
+      "nut": "04",
+      "severity": "info",
+      "status": "error",
+      "summary": "Run incomplete: the mint could not create a Lightning invoice (HTTP 400 code=20003 Minting with bolt11 is disabled.). Its Lightning backend may be down; that is an availability problem, which NutCheck does not grade. Funded checks were not run.",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    }
+  ],
+  "funding": {
+    "source": "nwc",
+    "paid_in": 0,
+    "funded": false,
+    "carried_in": 0,
+    "leftover": 0,
+    "returned": 0,
+    "melt_fee": 0,
+    "dust": 0,
+    "ok": true
+  }
+}
