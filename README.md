@@ -23,17 +23,13 @@ NutCheck measures behaviour, not solvency. An A means the mint followed the rule
 
 ## What it found on live mints
 
-First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22):
+First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22) turned up one protocol bug, in both implementations:
 
-| Finding | Mints | Status |
-|---|---|---|
-| **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). CDK keeps the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. | All four CDK mints tested (Minibits, Macadamia, WesternBTC, testnut) | Graded B (medium). **Fix merged 16 Nov:** [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it |
-| Same issue in Nutshell before 0.21.0 | Voltz (Nutshell 0.20.3) | Graded B. Fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it |
-| Mint quote fails: the Lightning backend can't create invoices | Agorist | Free checks only (A*), flagged on the scorecard |
-| Minting disabled | 8333.space | Free checks only (A*) |
-| Everything passes, including locks, fee return and DLEQ on change | Chorus, Coinos, Cuba Bitcoin | A |
+- **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). The mint kept the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. Medium severity, graded B.
+  - **CDK:** every CDK mint tested was affected. Fix merged 16 Nov in [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it.
+  - **Nutshell before 0.21.0:** fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it.
 
-The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
+Current grades for each mint are on the [scorecard](https://nutcheck.org), which is re-tested daily. The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
 
 Lessons for anyone writing a wallet or tool against live mints:
 
