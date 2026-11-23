@@ -4,7 +4,9 @@ Safety rules:
 - a hard cap on sats paid out per sweep (`nwc_max_sat_per_run`, default 1000);
 - a pay-back is retried; if it still fails, the leftover ecash is stashed, encrypted with a key derived
   from the NWC secret, so it is never lost with the CI runner. The next funded sweep pays it back first;
-- after any failed pay-back or wallet error, no further mint is funded in that sweep;
+- after a wallet error, a pay-back that could not be stashed, or MAX_PAYBACK_FAILURES failed pay-backs,
+  no further mint is funded in that sweep (one misbehaving mint, its ecash stashed, does not stop the rest);
+- mints may be tested in parallel: wallet calls and the counters are serialised by one lock;
 - every problem becomes a funding alert, which fails the workflow so the owner is emailed.
 """
 from __future__ import annotations
@@ -13,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +27,7 @@ from .wallet import Proof, Wallet
 
 MIN_PAYBACK_SAT = 3
 RECOVER_NOW_SAT = 20  # smaller stashes are folded into that mint's next funded run instead
+MAX_PAYBACK_FAILURES = 3  # more than this many mints failing to pay back in one run looks like our bug: stop
 _RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError)
 
 
@@ -44,26 +48,32 @@ class Funder:
         self.paid_back = 0
         self.stopped: str | None = None
         self.alerts: list[str] = []
+        self.payback_failures = 0
+        self._lock = threading.RLock()
 
     def stop(self, reason: str):
-        if not self.stopped:
-            self.stopped = reason
-        self.alerts.append(reason)
+        with self._lock:
+            if not self.stopped:
+                self.stopped = reason
+            self.alerts.append(reason)
 
     # ---- paying in --------------------------------------------------------------------------------
 
-    def pay(self, invoice: str, amount: int):
-        """Used as the funded checks' on_invoice callback."""
-        if self.stopped:
-            raise FundingStopped(f"funding stopped earlier in this run: {self.stopped}")
-        if self.paid_out + amount > self.max:
-            raise FundingStopped(f"per-run cap of {self.max} sat reached")
-        try:
-            res = self.nwc.pay_invoice(invoice)
-        except (NWCError, OSError, TimeoutError, ConnectionError) as e:
-            self.stop(f"wallet could not pay a funding invoice: {e}")
-            raise FundingStopped(str(e)) from None
-        self.paid_out += amount + (res.get("fees_paid") or 0) // 1000
+    def pay(self, invoice: str, amount: int) -> int:
+        """Used as the funded checks' on_invoice callback. Returns the sats it cost, fees included."""
+        with self._lock:  # one payment at a time, so the cap holds when mints run in parallel
+            if self.stopped:
+                raise FundingStopped(f"funding stopped earlier in this run: {self.stopped}")
+            if self.paid_out + amount > self.max:
+                raise FundingStopped(f"per-run cap of {self.max} sat reached")
+            try:
+                res = self.nwc.pay_invoice(invoice)
+            except (NWCError, OSError, TimeoutError, ConnectionError) as e:
+                self.stop(f"wallet could not pay a funding invoice: {e}")
+                raise FundingStopped(str(e)) from None
+            cost = amount + (res.get("fees_paid") or 0) // 1000
+            self.paid_out += cost
+            return cost
 
     # ---- paying back ------------------------------------------------------------------------------
 
@@ -80,7 +90,8 @@ class Funder:
                 res = self._melt_back(wallet, label)
                 if res is not None:
                     out.update(res)
-                    self.paid_back += res["returned"]
+                    with self._lock:
+                        self.paid_back += res["returned"]
                 if wallet.balance and self.stash_dir:
                     self.stash(wallet, label)  # change too small to pay back: reused next run, not lost
                     out["change_kept"] = wallet.balance
@@ -97,7 +108,14 @@ class Funder:
             why += f"; {wallet.balance} sat stashed encrypted in {path.name}, the next funded run pays it back"
         else:
             why += f"; {wallet.balance} sat left as ecash on the mint"
-        self.stop(why)
+        with self._lock:
+            self.payback_failures += 1
+            too_many = self.payback_failures >= MAX_PAYBACK_FAILURES
+        if isinstance(last, NWCError) or not out.get("stashed") or too_many:
+            self.stop(why + ("" if not too_many else f"; {self.payback_failures} pay-backs failed this run"))
+        else:
+            with self._lock:
+                self.alerts.append(why)  # this mint's problem: its ecash is safe, the other mints go on
         return out
 
     def _melt_back(self, wallet: Wallet, label: str) -> dict | None:
@@ -109,7 +127,8 @@ class Funder:
         for _ in range(4):
             if target < MIN_PAYBACK_SAT:
                 return None  # too little to be worth paying back
-            invoice = self.nwc.make_invoice(target, f"NutCheck leftover from {label}")
+            with self._lock:
+                invoice = self.nwc.make_invoice(target, f"NutCheck leftover from {label}")
             q = c.melt_quote(invoice, wallet.unit)
             need = q["amount"] + (q.get("fee_reserve") or 0) + in_fee
             if need > bal:

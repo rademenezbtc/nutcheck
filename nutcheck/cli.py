@@ -172,12 +172,18 @@ def cmd_sweep(argv):
     ap.add_argument("--nwc", action="store_true",
                     help='fund mints marked "funded": "nwc" from the wallet in the NWC_URL environment variable')
     ap.add_argument("--funding-alerts", metavar="FILE", help="write funding problems here (one per line)")
+    ap.add_argument("--free-only", action="store_true",
+                    help="run only the free checks on every mint (no sats, even for funded mints)")
+    ap.add_argument("--jobs", type=int, default=1, metavar="N", help="test N mints at a time (default 1)")
     a = ap.parse_args(argv)
+    free_run = a.free_only
     cfg, base = load_config(a.config)
     reports_dir = base / cfg.get("reports_dir", "reports")
     wallet_dir = base / cfg.get("wallet_dir", "wallet")
     funder = None
-    if a.nwc:
+    if a.nwc and a.free_only:
+        print("--nwc and --free-only together: running the free checks only", file=sys.stderr)
+    if a.nwc and not a.free_only:
         from .funding import Funder
         from .nwc import NWC
         uri = os.environ.get("NWC_URL", "")
@@ -191,27 +197,28 @@ def cmd_sweep(argv):
             if "recovered" not in line and "nothing left" not in line:
                 funder.alerts.append(f"stash: {line}")
     crashed: list[str] = []
-    for m in cfg["mints"]:
+
+    def run_one(m: dict):
         slug = mint_slug(m["url"])
-        if a.only and slug not in a.only:
-            continue
         mode = m.get("funded", False)
+        paid = [0]  # what funding this mint cost, fees included (other mints may be paying at the same time)
         if mode == "nwc":
             use_nwc = funder is not None and not funder.stopped
-            free_only = not use_nwc
-            pay = funder.pay if use_nwc else None
+            free_only = not use_nwc or free_run
+
+            def pay(inv, amt):
+                paid[0] += funder.pay(inv, amt)
         else:
-            use_nwc, free_only, pay = False, not mode, None
-        on_invoice = pay or (lambda inv, amt, s=slug: print(f"  [{s}] invoice for {amt} sat not paid automatically", flush=True))
-        preload = funder.take_stash(m["url"]) if (funder and mode == "nwc") else []
-        paid_before = funder.paid_out if funder else 0
+            use_nwc, free_only, pay = False, (not mode) or free_run, None
+        on_invoice = (pay if use_nwc else None) or (
+            lambda inv, amt, s=slug: print(f"  [{s}] invoice for {amt} sat not paid automatically", flush=True))
+        preload = funder.take_stash(m["url"]) if (funder and mode == "nwc" and not free_only) else []
         wallet = None
         try:
             report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
                                    on_invoice=on_invoice, preload=preload)
-            if funder and mode == "nwc":  # never pay a test mint's fake ecash back into the real wallet
-                paid_in = funder.paid_out - paid_before
-                report["funding"] = {"source": "nwc", "paid_in": paid_in, "funded": paid_in > 0,
+            if funder and mode == "nwc" and not free_only:  # never pay a test mint's fake ecash into the real wallet
+                report["funding"] = {"source": "nwc", "paid_in": paid[0], "funded": paid[0] > 0,
                                      "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}
             path = save_report(report, reports_dir)
             save_leftover(wallet, wallet_dir / f"{slug}.tokens")
@@ -223,16 +230,25 @@ def cmd_sweep(argv):
                     note += f"; {wallet.balance} sat stashed in {funder.stash(wallet, slug).name}"
                 except Exception as e2:  # noqa: BLE001
                     note += f"; could not stash {wallet.balance} sat ({e2})"
-            print(f"ERR {slug:<40} {note}")
+            print(f"ERR {slug:<40} {note}", flush=True)
             if funder:
                 funder.alerts.append(note)
             crashed.append(slug)
-            continue
+            return
         fund_note = ""
         if report.get("funding"):
             f = report["funding"]
             fund_note = f" [nwc: returned {f['returned']} of {f['leftover']} sat{'' if f['ok'] else ', PAY-BACK FAILED'}]"
-        print(f"{report['grade']:<3} {slug:<40} {'partial ' if report['partial'] else ''}→ {path}{fund_note}")
+        print(f"{report['grade']:<3} {slug:<40} {'partial ' if report['partial'] else ''}→ {path}{fund_note}", flush=True)
+
+    todo = [m for m in cfg["mints"] if not a.only or mint_slug(m["url"]) in a.only]
+    if a.jobs > 1:  # each mint is a different server, so testing several at once doesn't load any one of them
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=a.jobs) as pool:
+            list(pool.map(run_one, todo))
+    else:
+        for m in todo:
+            run_one(m)
     if funder:
         print(f"NWC: paid out {funder.paid_out} sat, paid back {funder.paid_back} sat"
               + (f"; funding stopped: {funder.stopped}" if funder.stopped else ""))

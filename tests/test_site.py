@@ -195,3 +195,17 @@ def test_phrases_say_which_way_a_lock_check_failed():
     assert phrase_for({"id": "htlc.hashlock", "severity": "medium"}) == "Refuses valid HTLC spends"
     assert phrase_for({"id": "htlc.hashlock", "severity": "critical"}) == "Ignores HTLC spending conditions"
     assert phrase_for({"id": "mint.quote_lock", "severity": "medium"}) == "Refuses correctly signed locked quotes"
+
+
+def test_one_grade_with_a_line_for_each_half(tmp_path):
+    feed, out = _feed(tmp_path, [_funded_b, _free_only, _free_only])
+    html = (out / "index.html").read_text()
+    assert "Free checks · 1 Nov, 18:00 · passed<br>Paid checks · 1 Nov, 06:00 · 1 failed" in html
+    assert "B*" not in html and "A*" not in html
+
+
+def test_paid_line_says_why_paid_checks_did_not_run(tmp_path):
+    feed, out = _feed(tmp_path, [_free_only])
+    page = (out / "mints" / "127.0.0.1_3399.html").read_text()
+    assert "Paid checks · not run: free checks only for this mint" in page
+    assert ">A<" in page and "A*" not in page

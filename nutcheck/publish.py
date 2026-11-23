@@ -116,11 +116,12 @@ def publishable(v) -> bool:
 def review(v, cfg: dict, seckey: int, created_at: int | None = None) -> dict:
     from .site import run_tip
     L = v.latest
-    grade = L["grade"] + ("*" if L.get("partial") else "")
+    grade = L["grade"]
     findings = run_tip(v, L).split("\n")[1:]
-    reason = v.partial_reason.removeprefix(" · ")
-    if reason and findings == ["All checks passed (free checks only)"]:
-        findings = [f"Free checks passed; {reason}"]
+    if L.get("partial"):
+        not_run = f"paid checks not run: {v.paid_reason}"
+        findings = [f"Free checks passed; {not_run}" if f == "All checks passed (free checks only)"
+                    else not_run[:1].upper() + not_run[1:] if f == "Paid checks not run" else f for f in findings]
     page = cfg.get("base_url", "https://nutcheck.org/") + f"mints/{v.slug}.html"
     rating = rating_for(L)
     content = f"[{rating}/5] NutCheck grade {grade}. {'. '.join(f.rstrip('.') for f in findings)}. Evidence: {page}"
@@ -135,8 +136,8 @@ def profile(cfg: dict, seckey: int, created_at: int | None = None) -> dict:
     base = cfg.get("base_url", "https://nutcheck.org/")
     meta = {"name": "NutCheck", "display_name": "NutCheck",
             "about": ("Independent protocol tests for Cashu mints: DLEQ proofs, keyset IDs, P2PK/HTLC locks, "
-                      "double spends, payouts and fee refunds. Grades A–F with evidence, re-tested daily. "
-                      "Reviews are NIP-87 events: A = 5/5, B = 4, C = 3, D = 2, F = 1; a partial run (*) gets at most 4. "
+                      "double spends, payouts and fee refunds. Grades A–F with evidence, free checks twice a day, paid checks daily. "
+                      "Reviews are NIP-87 events: A = 5/5, B = 4, C = 3, D = 2, F = 1; a run whose paid checks could not run gets at most 4. "
                       "Measures behaviour, not solvency."),
             "picture": base + "logo.png", "website": base,
             "lud16": cfg.get("lightning", "nutcheck@rizful.com")}

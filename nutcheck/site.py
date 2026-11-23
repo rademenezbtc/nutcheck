@@ -86,6 +86,21 @@ def fmt_day(dt: datetime) -> str:
     return dt.strftime("%-d %b")
 
 
+def fmt_short(iso: str) -> str:
+    return datetime.fromisoformat(iso).astimezone(timezone.utc).strftime("%-d %b, %H:%M")
+
+
+def _tally(rs: list[dict]) -> str:
+    """'passed', or what went wrong in a few words: '2 failed, 1 warning'."""
+    f = sum(r["status"] == "fail" for r in rs)
+    w = sum(r["status"] == "warn" for r in rs)
+    e = sum(r["status"] == "error" for r in rs)
+    parts = ([f"{f} failed"] if f else []) + ([f"{w} warning{'s' if w > 1 else ''}"] if w else [])
+    if e:
+        parts.append("incomplete")
+    return ", ".join(parts) or "passed"
+
+
 def _lc(s: str) -> str:
     """Lower-case only the first letter, so names like Lightning and NUT-12 survive."""
     return s[:1].lower() + s[1:]
@@ -152,9 +167,11 @@ class MintView:
 
     @property
     def grade(self) -> str:
+        """One grade, from everything that ran: the latest free checks plus the latest paid ones.
+        When and how each half ran is shown next to it (free_line, paid_line), not folded into the grade."""
         if not self.latest.get("reachable", True):
             return "—"
-        return self.latest["grade"] + ("*" if self.latest.get("partial") else "")
+        return self.latest["grade"]
 
     @property
     def band(self) -> str:
@@ -185,24 +202,58 @@ class MintView:
     def meta(self) -> str:
         if self.grade == "—":
             return "Unreachable in the last run"
-        return f"{self.software} · {self.fee}{self.partial_reason}"
+        return f"{self.software} · {self.fee}"
+
+    @property
+    def free_line(self) -> tuple[str, str]:
+        """(when, how) for the latest free checks."""
+        L = self.latest
+        return fmt_short(L["started"]), _tally([r for r in L["results"] if not r.get("funded")])
+
+    @property
+    def paid_line(self) -> tuple[str, str]:
+        """(when, how) for the latest paid checks, or why they haven't run."""
+        L = self.latest
+        tested = [r for r in L["results"] if r.get("funded") and r["status"] in ("pass", "fail", "warn")]
+        if tested:
+            funded = [r for r in L["results"] if r.get("funded")]
+            return fmt_short(L.get("funded_from") or L["started"]), _tally(funded)
+        return self.paid_attempt, f"not run: {self.paid_reason}"
+
+    @property
+    def paid_attempt(self) -> str:
+        tried = next((r for r in reversed(self.reports) if _tried_funded(r)), None)
+        return fmt_short(tried["started"]) if tried else ""
+
+    @property
+    def paid_reason(self) -> str:
+        """Why there are no paid results to show, in a few words."""
+        L = self.latest
+        if any(r["id"] == "nutcheck.inconclusive" for r in L["results"]):
+            return "mint returned errors"
+        if not self.cfg.get("funded"):
+            return "free checks only for this mint"
+        # A free-only run says nothing about why the paid checks are missing: ask the latest paid attempt.
+        tried = L if _tried_funded(L) else next((r for r in reversed(self.reports) if _tried_funded(r)), None)
+        if tried is None:
+            return "not yet"
+        if any(r["id"] == "mint.quote" and r["status"] == "error" for r in tried["results"]):
+            return "mint can't issue ecash"
+        if any(r["id"] == "mint.funded" and r["status"] == "skip" for r in tried["results"]):
+            return "funding failed"
+        return "incomplete"
 
     @property
     def partial_reason(self) -> str:
-        """Why only part of the suite ran, in a few words."""
-        L = self.latest
-        if not L.get("partial"):
+        """Kept for older callers: ' · paid checks not run (why)', or '' when they ran."""
+        return f" · paid checks not run ({self.paid_reason})" if self.latest.get("partial") else ""
+
+    def lines_html(self, sep: str = "<br>") -> str:
+        if self.grade == "—":
             return ""
-        errs = {r["id"] for r in L["results"] if r["status"] == "error"}
-        if "nutcheck.inconclusive" in errs:
-            return " · mint returned errors, run incomplete"
-        # A free-only run says nothing about why the paid checks are missing: ask the latest paid attempt.
-        tried = L if _tried_funded(L) else next((r for r in reversed(self.reports) if _tried_funded(r)), None)
-        if tried and any(r["id"] == "mint.quote" and r["status"] == "error" for r in tried["results"]):
-            return " · can't issue ecash, so paid checks can't run"
-        if tried is L:
-            return " · paid checks incomplete"
-        return " · free checks only"
+        (fw, fh), (pw, ph) = self.free_line, self.paid_line
+        paid = f"Paid checks · {pw} · {ph}" if pw else f"Paid checks · {ph}"
+        return f"Free checks · {escape(fw)} · {escape(fh)}{sep}{escape(paid)}"
 
     def tip(self, cat: str, state: str) -> str:
         """Tooltip for one category mark: what was checked, and what went wrong if anything."""
@@ -211,7 +262,7 @@ class MintView:
             return f"{cat}: all {sum(r['status'] == 'pass' for r in rs)} checks passed"
         bad = [r for r in rs if r["status"] in ("fail", "warn", "error")]
         if not bad:
-            why = "funded checks not run this time" if self.latest.get("partial") else "not applicable"
+            why = "paid checks not run this time" if self.latest.get("partial") else "not applicable"
             return f"{cat}: {why}"
         lines = [f"{cat}:"]
         for r in bad:
@@ -241,7 +292,7 @@ def _tried_funded(report: dict) -> bool:
 
 def with_funded(report: dict, earlier: list[dict]) -> dict:
     """Free-only runs happen more often than funded ones. Combine a free-only run with the most recent
-    funded results, so a mint's grade doesn't flip between B and A* depending on which kind ran last.
+    funded results, so a mint's grade doesn't flip depending on which kind ran last.
     Funded results are not carried over a change in the mint's software version: they may no longer hold."""
     if not report.get("reachable", True) or _tried_funded(report):
         return report
@@ -340,7 +391,7 @@ nav.main a[aria-current]{background:#EEF0FB;color:#2E3FB8;font-weight:600}
 .btn.line{border:1px solid #D6D6D0;color:#15171C;background:#fff}
 main{padding:40px 0 64px;display:flex;flex-direction:column;gap:28px}
 .card{background:#fff;border:1px solid #E3E3DE;border-radius:16px}
-.muted{color:#5A5F6B}.small{font-size:13px}
+.muted{color:#5A5F6B}.small{font-size:13px}.runs{margin-top:2px;line-height:1.45}
 .hero{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-end}
 .hero h1{margin:0 0 12px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .hero p{margin:0;font-size:17px;color:#4A4F5B;max-width:680px}
@@ -546,7 +597,7 @@ def run_tip(v: MintView, r: dict) -> str:
     head = escape(fmt_time(r["started"]))
     if not r.get("reachable", True):
         return f"{head} · didn't answer"
-    lines = [f"{head} · {r['grade']}{'*' if r.get('partial') else ''}"]
+    lines = [f"{head} · {r['grade']}"]
     bad = [x for x in r["results"] if x["status"] in ("fail", "warn")]
     if v.withheld and any(x["status"] == "fail" and x["severity"] in SEVERE for x in bad):
         lines.append(f"Serious failure, details withheld until {fmt_day(v.publish_on)}")
@@ -565,6 +616,8 @@ def run_tip(v: MintView, r: dict) -> str:
         seen.append(f"Incomplete: {first if first[:2].isupper() else _lc(first)}"[:160])
     elif not seen:
         seen.append("All checks passed" + (" (free checks only)" if r.get("partial") else ""))
+    elif r.get("partial"):
+        seen.append("Paid checks not run")
     return "\n".join(lines + seen)
 
 
@@ -598,7 +651,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
     heads = "".join(_head(c) for c in CATEGORIES)
     group_row = (f'<tr class="groups"><td colspan="2"></td>'
                  f'<th scope="colgroup" colspan="{len(FREE_CATEGORIES)}">Free checks</th>'
-                 f'<th scope="colgroup" colspan="{len(FUNDED_CATEGORIES)}" class="gstart">Funded checks</th>'
+                 f'<th scope="colgroup" colspan="{len(FUNDED_CATEGORIES)}" class="gstart">Paid checks</th>'
                  f'<td colspan="2"></td></tr>')
     rows = []
     for v in views:
@@ -615,7 +668,8 @@ def render_index(views: list[MintView], cfg: dict) -> str:
         rows.append(f"""<tr data-band="{v.band}">
 <td>{grade_tile(v.grade)}</td>
 <td><a class="mname" href="mints/{v.slug}.html">{escape(v.name)}</a>
-<div class="mono small muted">{escape(v.url)}</div><div class="small muted" style="margin-top:4px">{escape(v.meta)}</div></td>
+<div class="mono small muted">{escape(v.url)}</div><div class="small muted" style="margin-top:4px">{escape(v.meta)}</div>
+<div class="small muted runs">{v.lines_html()}</div></td>
 {cells}
 <td>{history_bars(v, 14)}</td>
 <td class="muted" style="white-space:nowrap">{escape(fmt_time(v.latest['started']))}</td></tr>""")
@@ -631,7 +685,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <span>An A means the mint followed the protocol in our last test. It says nothing about whether the mint holds the bitcoin behind its ecash. For uptime and payout history, see the Cashu round-robin auditor.</span></div>
 <section class="card" aria-label="Mints" style="overflow:hidden">
 <div class="toolbar"><div role="group" aria-label="Filter by grade" style="display:flex;flex-wrap:wrap;gap:6px">{pill_html}</div>
-<span class="small muted" style="margin-left:auto">* only part of the checks ran · — unreachable</span></div>
+<span class="small muted" style="margin-left:auto">— unreachable</span></div>
 <div class="scroll"><table class="mints"><thead>{group_row}<tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
 <th scope="col">Last 14 runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
@@ -733,8 +787,6 @@ def render_mint(v: MintView, cfg: dict) -> str:
     if active:
         tags.append(f'<span class="tag">{escape(active[0]["unit"])} · {escape(v.fee)}</span>')
         tags.append(f'<span class="tag mono">keyset {escape(active[0]["id"][:12])}…</span>')
-    if L.get("funded_from"):
-        tags.append(f'<span class="tag">funded checks from {escape(fmt_time(L["funded_from"]))}</span>')
     fails = v.fails
     passes = [r for r in L["results"] if r["status"] == "pass"]
     skips = [r for r in L["results"] if r["status"] == "skip"]
@@ -760,7 +812,7 @@ def render_mint(v: MintView, cfg: dict) -> str:
                f'<p>No failures, but {len(fails)} warning{"s" if len(fails) > 1 else ""} below.</p></section>')
     else:
         why = (f'<section class="why" style="background:{sbg}"><h2 style="color:{sfg}">Every check passed</h2>'
-               f'<p>{len(passes)} checks passed' + (', but the funded checks were not run, so this grade is partial.' if L.get("partial") else '.') + '</p></section>')
+               f'<p>{len(passes)} checks passed' + (f'. The paid checks haven\'t run ({escape(v.paid_reason)}), so this grade covers the free checks only.' if L.get("partial") else '.') + '</p></section>')
 
     # failures
     fail_html = ""
@@ -834,6 +886,7 @@ def render_mint(v: MintView, cfg: dict) -> str:
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">{''.join(tags)}</div></div>
 <div style="flex:1 1 280px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:#4A4F5B">
 <div><b style="color:#15171C">Tested</b> {escape(fmt_time(L['started']))}</div>
+<div class="runs">{v.lines_html()}</div>
 <div>{len(L['results'])} checks · {L.get('requests', 0)} requests · {L['duration_s']} s{f" · {L['spent_sat']} sat spent" if L.get('spent_sat') else ''}</div>
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">{report_link}
 <a class="btn line" href="../badge/{v.slug}.svg">Badge</a></div></div></section>

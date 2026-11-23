@@ -9,7 +9,7 @@ license = { file = "LICENSE" }
 [project.optional-dependencies]
 proxy = ["starlette", "uvicorn"]
 nwc = ["websockets>=13", "cryptography>=42"]
-dev = ["pytest"]
+dev = ["pytest", "pyyaml"]
 
 [project.scripts]
 nutcheck = "nutcheck.cli:main"

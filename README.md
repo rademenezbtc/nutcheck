@@ -7,7 +7,7 @@
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
 
-**Live scorecard: [nutcheck.org](https://nutcheck.org)**, re-tested daily, with real sats.
+**Live scorecard: [nutcheck.org](https://nutcheck.org)**: 49 public mints, free checks twice a day, paid checks with real sats once a day.
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
@@ -29,7 +29,7 @@ First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22) turned up 
   - **CDK:** every CDK mint tested was affected. Fix merged 16 Nov in [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it.
   - **Nutshell before 0.21.0:** fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it.
 
-Current grades for each mint are on the [scorecard](https://nutcheck.org), which is re-tested daily. The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
+Current grades for each mint are on the [scorecard](https://nutcheck.org), which re-runs the free checks twice a day and the paid ones daily. The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
 
 Lessons for anyone writing a wallet or tool against live mints:
 
@@ -50,7 +50,7 @@ Or install it:
 ```bash
 pip install git+https://github.com/rademenezbtc/nutcheck   # needs only httpx
 nutcheck <mint-url>                  # free checks, then asks you to pay a 64-sat invoice for the rest
-nutcheck <mint-url> --free-only      # nothing paid, partial grade (shown as A*)
+nutcheck <mint-url> --free-only      # nothing paid; the grade covers the free checks only
 nutcheck <mint-url> --fund 128 --json report.json
 ```
 
@@ -68,7 +68,7 @@ $ nutcheck https://mint.example.com --json report.json
   53 sat of leftover ecash saved to nutcheck-leftover.token
 ```
 
-A funded run costs about 15 sat: input fees and Lightning fees, plus 2 sat deliberately burned on a malformed lock. Everything else comes back as a `cashuA` token you can receive into any wallet.
+A funded run costs about 15–18 sat: input fees and Lightning fees, plus 2 sat deliberately burned on a malformed lock. Everything else comes back as a `cashuA` token you can receive into any wallet.
 
 ## Checks
 
@@ -78,7 +78,7 @@ A funded run costs about 15 sat: input fees and Lightning fees, plus 2 sat delib
 
 The fee-return test melts against an invoice from the same mint (an internal payment, so the Lightning fee is 0) and expects every overpaid sat back.
 
-**Grading:** the worst failure caps the grade. Critical (funds can be forged or stolen) → F, high (funds withheld, privacy broken) → C, medium (spec violation, limited impact) → B, low or a warning → A−. An asterisk means only the free checks ran.
+**Grading:** the worst failure caps the grade. Critical (funds can be forged or stolen) → F, high (funds withheld, privacy broken) → C, medium (spec violation, limited impact) → B, low or a warning → A−. Each mint has one grade, from the latest free and paid results together; two lines under it say when each half last ran and how it went, or why the paid checks didn't run.
 
 ## Get your mint listed
 
@@ -151,7 +151,7 @@ nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
-`.github/workflows/scorecard.yml` runs every check, free and funded, daily at 05:17 UTC on GitHub's free runners, keeps the report history on a separate `data` branch, and publishes to GitHub Pages. No server needed. After pushing a change to the site, run the workflow by hand to rebuild it.
+`.github/workflows/scorecard.yml` runs the free checks on every mint at 05:17 and 17:17 UTC, and the paid checks too in the 05:17 run, six mints at a time on GitHub's free runners. It keeps the report history on a separate `data` branch and publishes to GitHub Pages. No server needed. After pushing a change to the site, run the workflow by hand to rebuild it.
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 2. For funded checks, store an NWC connection string (send and receive) as the repository secret `NWC_URL`. Only the sweep step can read it, and it never appears in logs or reports. Give NutCheck a wallet that only holds what you're willing to spend.
@@ -161,8 +161,8 @@ nutcheck site scorecard.json -o site/    # build the site from all saved reports
 **When the run fails with "NutCheck needs your attention",** either NutCheck found a critical or high failure, or funding went wrong. GitHub emails you about the failed run, and the run summary says which. For a mint failure, contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
 
 Notes:
-- If a run can't fund a mint (or a manual run skips the paid checks), its page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so grades don't flip between B and A*.
-- `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run every time, for free.
+- If a run can't fund a mint (or a manual run skips the paid checks), its page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so a grade doesn't flip with every free-only run.
+- `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run in every paid sweep, for free.
 - An unresolved serious failure fails every run, so GitHub emails you up to 4 times a day until you set `"notified"`.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count. If the workflow ever shows as disabled, re-enable it in the Actions tab.
 - GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck and behave differently. That's an open problem.
@@ -175,7 +175,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 68 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 74 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -187,7 +187,8 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **15 Nov:** free checks every 6 hours, funded daily; signed NIP-87 reviews on Nostr, already shown in a Cashu wallet; mint pages show the exact lock a mint accepted; sweeps that survive a crash without losing ecash; grade-history tooltips; the [1-minute demo](https://nutcheck.org/demo/).
 - **16 Nov:** CDK merged the fix for the duplicate-tag issue ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888) by robwoodgate), three days after NutCheck posted evidence that every CDK mint it tests is affected.
 - **23 Nov:** four new checks: HTLC refunds after the locktime, `SIG_ALL` (the signature must cover the outputs), NUT-17 WebSocket subscriptions and NUT-20 locked mint quotes, each with a naughty-proxy fault in the CI matrix. The HTLC-refund and WebSocket checks follow issues found by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe), another Nut November mint tester ([cdk#2980](https://github.com/cashubtc/cdk/issues/2980), [cdk#2983](https://github.com/cashubtc/cdk/pull/2983)).
-- **Next:** more mints; a GitHub Action for operators.
+- **23 Nov (later):** one grade per mint with a line each for the free and the paid checks (when, and how they went) instead of the asterisk; 39 more mints from MintRadar and cashumints.space (49 in all, 45 with paid checks); free checks twice a day, paid daily; sweeps test six mints at a time.
+- **Next:** a GitHub Action for operators.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.
 

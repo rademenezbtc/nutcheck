@@ -30,14 +30,14 @@ def await_payment():
     httpx.post(PROXY + "/__naughty", json={"modes": []})
 
 
-def _sweep(tmp_path, monkeypatch, wallet, mints, cap=1000):
+def _sweep(tmp_path, monkeypatch, wallet, mints, cap=1000, extra=()):
     cfg = {"reports_dir": "reports", "wallet_dir": "wallet", "nwc_max_sat_per_run": cap, "mints": mints}
     (tmp_path / "sc.json").write_text(json.dumps(cfg))
     monkeypatch.setenv("NWC_URL", wallet.uri)
     alerts = tmp_path / "funding-alerts.txt"
-    assert cmd_sweep([str(tmp_path / "sc.json"), "--nwc", "--funding-alerts", str(alerts)]) == 0
+    assert cmd_sweep([str(tmp_path / "sc.json"), "--nwc", "--funding-alerts", str(alerts), *extra]) == 0
     reports = sorted((tmp_path / "reports").rglob("*.json"))
-    return [json.loads(p.read_text()) for p in reports], alerts.read_text()
+    return [json.loads(p.read_text()) for p in reports], (alerts.read_text() if alerts.exists() else "")
 
 
 def test_uri_parsing_never_exposes_secret():
@@ -134,3 +134,25 @@ def test_crash_outside_the_checks_does_not_stop_the_sweep(tmp_path, monkeypatch)
                                                   "mints": [{"url": PROXY}, {"url": MINT}]}))
     assert cmd_sweep([str(tmp_path / "sc.json")]) == 0
     assert [json.loads(p.read_text())["mint"] for p in (tmp_path / "reports").rglob("*.json")] == [MINT]
+
+
+def test_parallel_sweep_funds_each_mint_once(tmp_path, monkeypatch):
+    """Two mints at a time: each pays and is paid back on its own account, and the cap is shared."""
+    other = "http://localhost:3339"  # same proxy, a different mint as far as NutCheck is concerned
+    with FakeRelayWallet(7707, proxy_url=PROXY, mint_url=MINT) as w:
+        reps, alerts = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20},
+                                                         {"url": other, "funded": "nwc", "wait": 20}],
+                              extra=("--jobs", "2"))
+    assert len(w.paid) == 2 and len(reps) == 2
+    for r in reps:
+        assert r["funding"]["paid_in"] == 64 and r["funding"]["ok"], r["funding"]
+        assert not r["partial"], r["reasons"]
+    assert alerts == ""
+
+
+def test_free_only_sweep_spends_nothing(tmp_path, monkeypatch):
+    with FakeRelayWallet(7708, proxy_url=PROXY, mint_url=MINT) as w:
+        (rep,), _ = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}],
+                           extra=("--free-only",))
+    assert w.paid == [] and w.invoices == []
+    assert rep["partial"] and "funding" not in rep

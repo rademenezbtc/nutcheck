@@ -1,16 +1,18 @@
 # NutCheck sweep: test every mint in scorecard.json, keep the reports on the `data` branch,
 # publish the scorecard to GitHub Pages, and fail loudly (GitHub emails you) when a serious
 # failure needs reporting to a mint operator before its details go public.
-# Once a day, all checks: free ones plus funded ones (real sats, from the NWC wallet).
+# Twice a day the free checks run on every mint; once a day the paid ones too (real sats, from the NWC wallet).
 name: Scorecard
 
 on:
   schedule:
-    - cron: "17 5 * * *"   # 05:17 UTC daily, free + funded checks (off the hour; GitHub delays top-of-hour runs)
+    # Off the hour: GitHub delays top-of-hour runs. The paid run is the one whose cron equals PAID_CRON below.
+    - cron: "17 5 * * *"    # 05:17 UTC: free + paid checks
+    - cron: "17 17 * * *"   # 17:17 UTC: free checks only
   workflow_dispatch:
     inputs:
       funded:
-        description: 'Also run the funded checks now (spends ~110 sat; the daily 05:17 UTC run always does)'
+        description: 'Also run the paid checks now (spends ~800 sat across all mints; the daily 05:17 UTC run always does)'
         type: boolean
         default: false
       only:
@@ -27,10 +29,13 @@ concurrency:
   group: scorecard
   cancel-in-progress: false
 
+env:
+  PAID_CRON: "17 5 * * *"   # must match one of the schedule crons above (tests/test_workflow.py checks)
+
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     outputs:
       alerts: ${{ steps.alerts.outputs.text }}
     steps:
@@ -60,14 +65,17 @@ jobs:
           FUNDED_INPUT: ${{ inputs.funded }}
           ONLY: ${{ inputs.only }}
           EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
-          args=()
-          if [ "$FUNDED_INPUT" = "true" ] || [ "$EVENT" = "schedule" ]; then
+          args=(--jobs 6)   # mints are separate servers: 6 at a time keeps the sweep well under an hour
+          if [ "$FUNDED_INPUT" = "true" ] || { [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "$PAID_CRON" ]; }; then
             if [ -n "$NWC_URL" ]; then
               args+=(--nwc --funding-alerts funding-alerts.txt)
             else
-              echo "::warning::NWC_URL secret is not set; funded checks skipped"
+              echo "::warning::NWC_URL secret is not set; paid checks skipped"
             fi
+          else
+            args+=(--free-only)
           fi
           if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
           nutcheck sweep scorecard.json "${args[@]}"

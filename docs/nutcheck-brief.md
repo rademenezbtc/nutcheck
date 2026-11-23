@@ -103,7 +103,11 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
   - `ws.subscribe` (free): a claimed NUT-17 WebSocket must answer, and a proof_state subscription to a never-seen proof must get OK and then UNSPENT. Checked by hand on 23 Nov from a browser: all four CDK mints reply OK and then stay silent (cdk#2983 in review); all five Nutshell mints send UNSPENT. Low severity.
   - `mint.quote_lock`: NUT-20 on the melt's internal 8-sat quote, so it costs nothing extra. No signature or a wrong key must be refused (high if not); current message format first, legacy as a fallback that earns a low warning. All ten mints claim NUT-20.
 - **Cost:** about 3 sat more per funded run (two extra lock spends at the input fee).
-- **Tests:** 68, including the SIG_ALL and NUT-20 spec vectors and an 18-case fault matrix (17 faults plus the honest mint) against Nutshell 0.21.0.
+- **One grade, two lines.** The asterisk is gone. Each mint shows one grade (latest free + latest paid results, as before) and two lines under it: "Free checks · date · passed" and "Paid checks · date · 1 failed", or "not run: mint can't issue ecash / funding failed / free checks only for this mint". Nostr reviews say the same in words; a mint without paid results still gets at most 4/5.
+- **49 mints** (was 10): every reachable mint listed by MintRadar's API or cashumints.space on 23 Nov, deduplicated by mint pubkey (satscribe.me/cashu = mint.satscribe.me, nostrodomo = sharegap). 45 get paid checks; hashu.io, lekmint.cash and an LNbits mint have no sat Lightning minting, so free checks only. Unreachable or long-offline entries left out.
+- **Schedule:** free checks on every mint at 05:17 and 17:17 UTC, paid checks in the 05:17 run. Sweeps test six mints at a time (`--jobs 6`); wallet calls are serialised so the per-run cap (now 4,000 sat paid out) holds. One mint failing to pay back no longer stops funding for the rest, as long as its ecash is stashed; a wallet error, an unstashable leftover or three failed pay-backs still do.
+- **Expected cost:** about 15–18 sat per paid mint per day, so roughly 700–800 sat a day (~23,000 sat a month) for 45 mints, to be tuned down after the hackathon.
+- **Tests:** 74 (68 after the new checks, then parallel sweeps, free-only sweeps, the two-line display and the schedule guard), including the SIG_ALL and NUT-20 spec vectors and an 18-case fault matrix (17 faults plus the honest mint) against Nutshell 0.21.0.
 
 ## Submission checklist
 

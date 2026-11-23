@@ -48,6 +48,162 @@
     {
       "url": "https://mint.westernbtc.com",
       "funded": "nwc"
+    },
+    {
+      "url": "https://21mint.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://antifiat.cash",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://bb.mountainlake.io/cashu/api/v1/WpczZwvNES7wMa8ForKGmh",
+      "funded": false
+    },
+    {
+      "url": "https://cashu.21m.lol",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://cashu.boats",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://cashu.centurymetadata.org",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://cashu.cz",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://forge.flashapp.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://kashu.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://lekmint.cash/api",
+      "funded": false
+    },
+    {
+      "url": "https://m7.mountainlake.io",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.103100.xyz",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.21linz.at",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.28waves.com",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.cashu.chat",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.colbitcoin.com",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.fredix.xyz",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.gitvid.net",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.hanbitkorea.org",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.hashu.io",
+      "funded": false
+    },
+    {
+      "url": "https://mint.kashir.xyz",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.lemonfizz.st",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.lndiscs.duckdns.org",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.lnpay.cz",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.lnw.cash",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.mikelcalvo.net",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.mintlnd.org",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.mjex.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.mountainlake.io",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.nodenebula.com",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.nostrfeed.com",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.nostrzap.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.nuts.cash",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.satscribe.me",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.sharegap.net",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.sortug.com",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.sovran.money",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.ucash.space",
+      "funded": "nwc"
+    },
+    {
+      "url": "https://mint.unclerics.cash",
+      "funded": "nwc"
     }
   ],
   "known_issues": [
@@ -85,6 +241,6 @@
       "label": "CDK fix in review"
     }
   ],
-  "nwc_max_sat_per_run": 1000,
+  "nwc_max_sat_per_run": 4000,
   "stash_dir": "data/stash"
 }
