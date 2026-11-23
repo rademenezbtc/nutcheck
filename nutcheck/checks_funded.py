@@ -182,6 +182,12 @@ def _secret(kind: str, data: str, tags: list[list[str]]) -> str:
     return json.dumps([kind, {"nonce": secrets.token_hex(16), "data": data, "tags": tags}], separators=(",", ":"))
 
 
+def sig_all_message(inputs: list[Proof], outputs: list[Output], quote_id: str = "") -> str:
+    """NUT-11 SIG_ALL message: secret and C of every input, then amount and B_ of every output (+ quote for melt)."""
+    return ("".join(p.secret + p.C for p in inputs)
+            + "".join(str(o.amount) + o.blinded.B_hex for o in outputs) + quote_id)
+
+
 def _lock_view(secret: str) -> str:
     """The lock as evidence: its kind and tags, with the nonce removed and keys shortened.
     Without the nonce and the mint's signature it identifies and spends nothing."""
@@ -218,11 +224,19 @@ def _locks(ctx: Ctx):
             "active_lock": _secret("P2PK", A.pubkey_hex, [["locktime", str(now + 86400)], ["refund", R.pubkey_hex]]),
             "expired_lock": _secret("P2PK", A.pubkey_hex, [["locktime", str(now - 86400)], ["refund", R.pubkey_hex]]),
             "malformed": _secret("P2PK", A.pubkey_hex, [["locktime", str(now + 86400)], ["locktime", str(now + 1)]]),
+            # SIG_ALL: two inputs with the same data and tags; one signature in the first covers the whole swap
+            "sig_all_0": _secret("P2PK", A.pubkey_hex, [["sigflag", "SIG_ALL"]]),
+            "sig_all_1": _secret("P2PK", A.pubkey_hex, [["sigflag", "SIG_ALL"]]),
         }
     if htlc:
         specs |= {
             "htlc_plain": _secret("HTLC", hashlock, []),
             "htlc_sig": _secret("HTLC", hashlock, [["pubkeys", A.pubkey_hex]]),
+            # sender pathway (NUT-14): the refund key alone, no preimage, only once the locktime has passed
+            "htlc_active": _secret("HTLC", hashlock, [["pubkeys", A.pubkey_hex], ["locktime", str(now + 86400)],
+                                                      ["refund", R.pubkey_hex]]),
+            "htlc_expired": _secret("HTLC", hashlock, [["pubkeys", A.pubkey_hex], ["locktime", str(now - 86400)],
+                                                       ["refund", R.pubkey_hex]]),
         }
     names = list(specs)
     try:
@@ -248,6 +262,15 @@ def _locks(ctx: Ctx):
         q = Proof(proof.amount, proof.id, proof.secret, proof.C, witness)
         outs = ctx.spend_outputs([q])
         sigs, err = ctx.try_swap([q], outs)
+        if sigs:
+            w.proofs += w.unblind(sigs, outs)
+        return err is None, err
+
+    def attempt_many(proofs: list[Proof], witnesses: list[str | None], outs: list[Output] | None = None):
+        """Spend several locked proofs in one swap (default outputs: fresh ones worth inputs minus fee)."""
+        qs = [Proof(p.amount, p.id, p.secret, p.C, wit) for p, wit in zip(proofs, witnesses)]
+        outs = outs if outs is not None else ctx.spend_outputs(qs)
+        sigs, err = ctx.try_swap(qs, outs)
         if sigs:
             w.proofs += w.unblind(sigs, outs)
         return err is None, err
@@ -314,6 +337,40 @@ def _locks(ctx: Ctx):
             "and it MUST be rejected. Wallets and mints that read different copies of the tag disagree on when the "
             "refund key can spend, so a refund could open earlier than the receiver expects."))
 
+        # SIG_ALL (NUT-11): the signature must commit to every input and every output of the swap.
+        ins = [locked["sig_all_0"], locked["sig_all_1"]]
+        outs = ctx.spend_outputs(ins)
+        sig_all = lambda o: A.sign(sig_all_message(ins, o).encode())
+        tampered = ctx.spend_outputs(ins)  # same amounts, different blinded messages
+        cases = [
+            ("a separate signature on each input's secret (SIG_INPUTS style)",
+             [_witness([A.sign(p.secret.encode())]) for p in ins], None),
+            ("a SIG_ALL signature whose outputs were swapped after signing",
+             [_witness([sig_all(outs)]), None], tampered),
+        ]
+        leaked = None
+        for label, wits, o in cases:
+            ok, _ = attempt_many(ins, wits, o)
+            if ok:
+                leaked = label
+                break
+        if leaked:
+            ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.HIGH, St.FAIL,
+                    f"Accepted SIG_ALL inputs spent with {leaked}. The signature did not commit to the outputs, so "
+                    "anyone who sees a signed SIG_ALL transaction (a relay, a coordinator, a payment server) could "
+                    "redirect it to their own outputs.", lock=_lock_view(ins[0].secret))
+        else:
+            ok, err = attempt_many(ins, [_witness([sig_all(outs)]), None], outs)
+            if ok:
+                ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.HIGH, St.PASS,
+                        f"Refused: {'; '.join(c[0] for c in cases)}; accepted: one SIG_ALL signature over all inputs "
+                        "and outputs, in the first input")
+            else:
+                ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.MEDIUM, St.FAIL,
+                        "Refused the invalid spends, but also refused a correct SIG_ALL spend (one signature over "
+                        f"all inputs and outputs, in the first input): {err}. SIG_ALL ecash may be unspendable.",
+                        lock=_lock_view(ins[0].secret))
+
     if htlc:
         scenario("htlc.hashlock", "HTLC hash lock enforced", "14", [
             ("no preimage", _witness([])),
@@ -325,14 +382,39 @@ def _locks(ctx: Ctx):
             ("preimage with the wrong signature", _witness([B.sign(s.encode())], preimage)),
         ], ("preimage and receiver signature", _witness([A.sign(s.encode())], preimage)), locked["htlc_sig"])
 
+        s = locked["htlc_active"].secret
+        scenario("htlc.locktime", "HTLC refund key blocked before locktime", "14", [
+            ("refund key before locktime, no preimage", _witness([R.sign(s.encode())])),
+        ], ("preimage and receiver signature", _witness([A.sign(s.encode())], preimage)), locked["htlc_active"])
+
+        # Sender pathway: once the locktime has passed, the refund key alone spends the HTLC (no preimage).
+        p = locked["htlc_expired"]
+        s = p.secret
+        ok, err = attempt(p, _witness([R.sign(s.encode())]))
+        if ok:
+            ctx.add("htlc.refund", "HTLC refund works after locktime", "14", S.MEDIUM, St.PASS,
+                    "Refund key alone (no preimage) spent the expired HTLC")
+        else:
+            # The receiver pathway stays open after the locktime, so take the sats back that way.
+            back, _ = attempt(p, _witness([A.sign(s.encode())], preimage))
+            ctx.add("htlc.refund", "HTLC refund works after locktime", "14", S.MEDIUM, St.FAIL,
+                    f"Refund key could not spend an expired HTLC without a preimage: {err}. NUT-14 lets the sender "
+                    "reclaim with the refund signature alone once the locktime passes; on this mint a sender whose "
+                    "payment was never claimed cannot get it back."
+                    + ("" if back else " The receiver pathway (preimage and signature) also failed."),
+                    lock=_lock_view(s))
+
 
 def _melt(ctx: Ctx):
     w, c = ctx.wallet, ctx.client
     if not claimed(ctx.info, "5"):
         return
     amount = 8
+    # NUT-20: lock this internal quote to a key, so claiming it back below doubles as the quote-lock test
+    qkey = PrivateKey() if claimed(ctx.info, "20") else None
     try:
-        mq = c.mint_quote(amount, w.unit)  # internal invoice: the mint pays itself, Lightning fee is 0
+        # internal invoice: the mint pays itself, Lightning fee is 0
+        mq = c.mint_quote(amount, w.unit, qkey.pubkey_hex if qkey else None)
         melt_q = c.melt_quote(mq["request"], w.unit)
     except MintError as e:
         ctx.add("melt.quote", "Melt quote issued", "05", S.INFO, St.ERROR,
@@ -372,8 +454,71 @@ def _melt(ctx: Ctx):
     # the internal invoice should now be paid: claim it back
     try:
         st = c.mint_quote_state(mq["quote"])
-        if st.get("state") == "PAID" or st.get("paid"):
-            outs = w.outputs_for(amount)
-            w.proofs += w.unblind(c.mint(mq["quote"], [o.wire() for o in outs]), outs)
+        paid = st.get("state") == "PAID" or st.get("paid")
+    except MintError:
+        paid = False
+    if not paid:
+        return
+    if qkey:
+        _quote_lock(ctx, mq, qkey, amount)
+        return
+    try:
+        outs = w.outputs_for(amount)
+        w.proofs += w.unblind(c.mint(mq["quote"], [o.wire() for o in outs]), outs)
     except MintError:
         pass
+
+
+def nut20_message(quote: str, outputs: list[Output]) -> bytes:
+    """NUT-20 message (v1, May 2026): domain tag, then length-prefixed quote id, amounts and B_ bytes."""
+    lp = lambda b: len(b).to_bytes(4, "big") + b
+    msg = b"Cashu_MintQuoteSig_v1" + lp(quote.encode())
+    for o in outputs:
+        amt = o.amount.to_bytes((o.amount.bit_length() + 7) // 8, "big") if o.amount else b""
+        msg += lp(amt) + lp(bytes.fromhex(o.blinded.B_hex))
+    return msg
+
+
+def nut20_message_legacy(quote: str, outputs: list[Output]) -> bytes:
+    """NUT-20 message before May 2026: the quote id followed by every B_ as hex text."""
+    return (quote + "".join(o.blinded.B_hex for o in outputs)).encode()
+
+
+def _quote_lock(ctx: Ctx, mq: dict, key: PrivateKey, amount: int):
+    """NUT-20: a quote created with a pubkey must only mint with a signature from that key."""
+    w, c = ctx.wallet, ctx.client
+    title, quote = "Locked mint quote needs its signature", mq["quote"]
+    echoed = mq.get("pubkey")
+
+    def mint(sig):
+        outs = w.outputs_for(amount)
+        try:
+            w.proofs += w.unblind(c.mint(quote, [o.wire() for o in outs], sig(outs) if sig else None), outs)
+            return True, None
+        except MintError as e:
+            return False, e
+
+    for label, sig in [("no signature", None),
+                       ("a signature from the wrong key", lambda o: PrivateKey().sign(nut20_message(quote, o)))]:
+        ok, _ = mint(sig)
+        if ok:
+            ctx.add("mint.quote_lock", title, "20", S.HIGH, St.FAIL,
+                    f"Mint claims NUT-20 but issued a paid, key-locked quote with {label}"
+                    + ("" if echoed else " (its quote response also dropped the pubkey)")
+                    + ". Anyone who learns a quote ID, from logs, a shared screen or a leaky wallet, can mint the "
+                    "payment for themselves.", quote_pubkey_echoed=bool(echoed))
+            return
+    ok, err = mint(lambda o: key.sign(nut20_message(quote, o)))
+    if ok:
+        ctx.add("mint.quote_lock", title, "20", S.HIGH, St.PASS,
+                "Refused: no signature, a signature from the wrong key; accepted: the quote key's signature")
+        return
+    ok, _ = mint(lambda o: key.sign(nut20_message_legacy(quote, o)))
+    if ok:
+        ctx.add("mint.quote_lock", title, "20", S.LOW, St.WARN,
+                "The lock is enforced, but the mint only accepts the pre-May-2026 signature format and refused the "
+                f"current one ({err}). Up-to-date wallets cannot mint their locked quotes here.")
+    else:
+        ctx.add("mint.quote_lock", title, "20", S.MEDIUM, St.FAIL,
+                f"Refused minting without a valid signature, but also refused the quote key's own signature ({err}), "
+                f"in both the current and the old format. A paid, locked quote cannot be redeemed ({amount} sat).")

@@ -29,7 +29,7 @@ _CATEGORY_RULES = [  # first matching prefix wins
     ("swap.rejects_forgery", "Forgery"), ("dleq.", "DLEQ"),
     ("keys.", "Keys"), ("mint.", "Issuing"), ("swap.", "Spending"), ("checkstate.", "Spending"),
     ("p2pk.", "Locks"), ("htlc.", "Locks"), ("locks.", "Locks"), ("melt.", "Payouts"),
-    ("info.", "Info"), ("transport.", "Info"),
+    ("info.", "Info"), ("transport.", "Info"), ("ws.", "Info"),
 ]
 
 

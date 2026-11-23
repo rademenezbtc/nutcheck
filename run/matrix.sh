@@ -1,7 +1,8 @@
 #!/bin/bash
 # Runs NutCheck through the naughty proxy once per mode and prints the grade + failed checks.
 cd "$(dirname "$0")/.."
-for mode in none bad_dleq no_dleq keyset_tamper fee_lie short_mint quote_replay overspend double_spend forgery lock_bypass keep_change info_lie; do
+for mode in none bad_dleq no_dleq keyset_tamper fee_lie short_mint quote_replay overspend double_spend forgery lock_bypass keep_change info_lie \
+            sigall_ignore htlc_no_refund quote_lock_ignore ws_dead ws_silent; do
   m=$([ "$mode" = none ] && echo '[]' || echo "[\"$mode\"]")
   curl -s -X POST localhost:3339/__naughty -d "{\"modes\": $m}" >/dev/null
   .venv/bin/python -m nutcheck http://127.0.0.1:3339 --no-color --json run/report-$mode.json --leftover /dev/null >/dev/null 2>&1

@@ -128,14 +128,20 @@ class MintClient:
     def keys(self, keyset_id: str | None = None):
         return self.get(f"/v1/keys/{keyset_id}" if keyset_id else "/v1/keys")["keysets"]
 
-    def mint_quote(self, amount: int, unit: str = "sat"):
-        return self.post("/v1/mint/quote/bolt11", {"amount": amount, "unit": unit})
+    def mint_quote(self, amount: int, unit: str = "sat", pubkey: str | None = None):
+        body = {"amount": amount, "unit": unit}
+        if pubkey:
+            body["pubkey"] = pubkey  # NUT-20: lock the quote to this key
+        return self.post("/v1/mint/quote/bolt11", body)
 
     def mint_quote_state(self, quote: str):
         return self.get(f"/v1/mint/quote/bolt11/{quote}")
 
-    def mint(self, quote: str, outputs: list[dict]):
-        return self.post("/v1/mint/bolt11", {"quote": quote, "outputs": outputs})["signatures"]
+    def mint(self, quote: str, outputs: list[dict], signature: str | None = None):
+        body = {"quote": quote, "outputs": outputs}
+        if signature is not None:
+            body["signature"] = signature
+        return self.post("/v1/mint/bolt11", body)["signatures"]
 
     def swap(self, inputs: list[dict], outputs: list[dict]):
         return self.post("/v1/swap", {"inputs": inputs, "outputs": outputs})["signatures"]

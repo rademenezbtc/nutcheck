@@ -22,9 +22,9 @@ Nobody checks whether a live mint **follows the protocol**. NutCheck does: valid
 
 ## Test catalogue
 
-**Free** (no ecash spent): HTTPS · info well formed and clock skew · keys are valid points · no key reused across amounts · keyset ID re-derivation (v1 and v2; v2 commits to `input_fee_ppk`, so a fee lie also breaks the ID) · active keyset exists · forged proof refused · claimed NUT endpoints answer.
+**Free** (no ecash spent): HTTPS · info well formed and clock skew · keys are valid points · no key reused across amounts · keyset ID re-derivation (v1 and v2; v2 commits to `input_fee_ppk`, so a fee lie also breaks the ID) · active keyset exists · forged proof refused · claimed NUT endpoints answer · NUT-17 WebSocket answers and sends the current state of a never-seen proof (UNSPENT) first.
 
-**Funded** (64 sat budget, about 11 sat actually spent per run at 100 ppk): paid quote issues full amount · quote can't be minted twice · DLEQ on mint, swap and melt change · overspend refused · advertised fee is the real fee · double spend and duplicate input refused · checkstate reports SPENT · P2PK (missing/wrong signature, 1-of-2 multisig, refund key before locktime, duplicate tag all refused; valid spends accepted; refund works after locktime) · HTLC (missing/wrong preimage, missing receiver signature refused) · melt pays · overpaid fees returned (melting against the mint's *own* invoice, where the true Lightning fee is 0, so every overpaid sat must come back).
+**Funded** (64 sat budget, about 11 sat actually spent per run at 100 ppk): paid quote issues full amount · quote can't be minted twice · DLEQ on mint, swap and melt change · overspend refused · advertised fee is the real fee · double spend and duplicate input refused · checkstate reports SPENT · P2PK (missing/wrong signature, 1-of-2 multisig, refund key before locktime, duplicate tag all refused; valid spends accepted; refund works after locktime) · SIG_ALL (per-input signatures and outputs swapped after signing refused; one signature over all inputs and outputs accepted) · HTLC (missing/wrong preimage, missing receiver signature, refund key before locktime refused; refund key alone works after locktime) · melt pays · overpaid fees returned (melting against the mint's *own* invoice, where the true Lightning fee is 0, so every overpaid sat must come back) · NUT-20: the melt's internal quote is locked to a key; claiming it back without a signature or with the wrong key must fail, with the right key succeed (current message format first, the pre-May-2026 one as a fallback that only earns a warning).
 
 Every "must refuse" test has a "must accept" control built the same way, so a mint that refuses everything can't pass.
 
@@ -32,7 +32,7 @@ Every "must refuse" test has a "must accept" control built the same way, so a mi
 
 ## Naughty proxy
 
-A reverse proxy in front of an honest FakeWallet mint that misbehaves on cue, so the demo needs no changes to CDK or Nutshell. Twelve modes: `bad_dleq`, `no_dleq`, `keyset_tamper`, `fee_lie`, `short_mint`, `quote_replay`, `overspend`, `double_spend`, `forgery`, `lock_bypass`, `keep_change`, `info_lie`. For the "accepts what it shouldn't" faults, the proxy mints the client's outputs from a fake-paid quote, so the client receives real signatures, exactly as from a broken mint. Modes switch live via `POST /__naughty`.
+A reverse proxy in front of an honest FakeWallet mint that misbehaves on cue, so the demo needs no changes to CDK or Nutshell. Seventeen grading modes: `bad_dleq`, `no_dleq`, `keyset_tamper`, `fee_lie`, `short_mint`, `quote_replay`, `overspend`, `double_spend`, `forgery`, `lock_bypass`, `keep_change`, `info_lie`, plus (23 Nov) `sigall_ignore`, `htlc_no_refund`, `quote_lock_ignore`, `ws_dead`, `ws_silent`. The proxy also relays the NUT-17 WebSocket. For the "accepts what it shouldn't" faults, the proxy mints the client's outputs from a fake-paid quote, so the client receives real signatures, exactly as from a broken mint. Modes switch live via `POST /__naughty`.
 
 ## Day-one spike results (13 Nov)
 
@@ -94,6 +94,17 @@ Live at **https://nutcheck.org**: all checks, free and funded, once a day.
 
 About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). Funded runs are daily: measured on 14 Nov at about 107 sat a day for the 7 mints that can be funded (Minibits only 4 sat, having no input fee), so about 3,200 sat a month; testnut is free. Each extra funded mint adds about 500 sat a month. Hosting is free (GitHub Actions and Pages); the domain is the only fixed cost.
 
+## Status (23 Nov)
+
+- **Submitted** to Nut November; updates count until 27 Nov 23:59 UTC, winners on 30 Nov.
+- **Four new checks**, prompted by Mintprobe (another Nut November mint tester, which renamed itself from "Nutcheck" on 22 Nov) finding CDK issues NutCheck didn't test:
+  - `htlc.refund` / `htlc.locktime`: NUT-14 sender pathway. The refund key alone (no preimage) must spend an expired HTLC, and must not spend an active one. On failure NutCheck takes the sats back through the receiver pathway. CDK 0.18.x is expected to fail (cdk#2980; fixed on main by #2641, unreleased).
+  - `p2pk.sig_all`: a SIG_ALL signature must commit to the outputs. Per-input signatures and outputs swapped after signing must be refused; one signature over everything in the first input must be accepted. High if it leaks (whoever relays a signed transaction could redirect it), medium if a valid spend is refused.
+  - `ws.subscribe` (free): a claimed NUT-17 WebSocket must answer, and a proof_state subscription to a never-seen proof must get OK and then UNSPENT. Checked by hand on 23 Nov from a browser: all four CDK mints reply OK and then stay silent (cdk#2983 in review); all five Nutshell mints send UNSPENT. Low severity.
+  - `mint.quote_lock`: NUT-20 on the melt's internal 8-sat quote, so it costs nothing extra. No signature or a wrong key must be refused (high if not); current message format first, legacy as a fallback that earns a low warning. All ten mints claim NUT-20.
+- **Cost:** about 3 sat more per funded run (two extra lock spends at the input fee).
+- **Tests:** 68, including the SIG_ALL and NUT-20 spec vectors and an 18-case fault matrix (17 faults plus the honest mint) against Nutshell 0.21.0.
+
 ## Submission checklist
 
 - [x] Repo public with README, licence (MIT) and the test suites (github.com/rademenezbtc/nutcheck)
@@ -103,5 +114,6 @@ About 15 sat per funded run per mint (input fees plus 2 sat burned on purpose). 
 - [x] Scorecard page live at nutcheck.org
 - [x] CI running the fault matrix against a real mint
 - [x] This brief updated with what changed
-- [ ] Comment on CDK PR #2888 with NutCheck's evidence; tell the Voltz operator about Nutshell 0.21.0
-- [ ] Submit at nutnovember.org/form before 27 Nov 23:59 UTC, saying all work is new since 13 Nov
+- [x] Comment on CDK PR #2888 with NutCheck's evidence (14 Nov)
+- [ ] Tell the Voltz operator about Nutshell 0.21.0
+- [x] Submit at nutnovember.org/form, saying all work is new since 13 Nov (updates count until 27 Nov 23:59 UTC)

@@ -23,7 +23,8 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 MODES = {
     "bad_dleq": "corrupt DLEQ proofs on every blind signature",
@@ -38,6 +39,11 @@ MODES = {
     "lock_bypass": "ignore P2PK/HTLC spending conditions",
     "keep_change": "pay the invoice but keep the overpaid fee change",
     "info_lie": "claim NUT-07 checkstate but answer 404",
+    "ws_dead": "keep advertising NUT-17 but answer 404 on /v1/ws",
+    "ws_silent": "accept WebSocket subscriptions but never send the current state",
+    "htlc_no_refund": "refuse the HTLC refund path (refund signature without a preimage), like CDK 0.18.x",
+    "sigall_ignore": "accept SIG_ALL spends whose signature does not cover the outputs",
+    "quote_lock_ignore": "ignore NUT-20: drop the quote pubkey, then mint the quote without a signature",
     "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
     "rate_limit_burst": "answer 429 to every 8th request, twice in a row (a mint with a strict nginx limit)",
     "rate_limit_hard": "answer 429 to everything after the first 25 requests (a mint that throttles hard)",
@@ -90,6 +96,37 @@ async def substitute_key() -> str:
     return SUBSTITUTE_KEY
 
 
+async def relay_ws(client: WebSocket):
+    """Pass NUT-17 WebSocket traffic through to the mint (or misbehave, per mode)."""
+    import websockets
+    if on("ws_dead"):
+        try:  # answer the upgrade with a plain 404, like a mint whose reverse proxy has no /v1/ws route
+            await client.send_denial_response(JSONResponse({"detail": "Not Found"}, 404))
+        except RuntimeError:  # server without the denial-response extension: refused with 403 instead
+            await client.close(code=1008)
+        return
+    await client.accept()
+    url = str(upstream.base_url).rstrip("/").replace("http", "ws", 1) + "/v1/ws"
+    async with websockets.connect(url) as mint:
+        async def up():
+            try:
+                while True:
+                    await mint.send(await client.receive_text())
+            except WebSocketDisconnect:
+                await mint.close()
+
+        async def down():
+            async for msg in mint:
+                if on("ws_silent") and json.loads(msg).get("method") == "subscribe":
+                    continue  # swallow notifications
+                await client.send_text(msg)
+
+        done, pending = await asyncio.wait([asyncio.create_task(up()), asyncio.create_task(down())],
+                                           return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
+
+
 async def handle(request: Request):
     path = request.url.path
     body = await request.body()
@@ -124,6 +161,15 @@ async def handle(request: Request):
     if on("info_lie") and path == "/v1/checkstate":
         return JSONResponse({"detail": "Not Found"}, 404)
 
+    if path == "/v1/swap" and req_json and on("htlc_no_refund"):
+        for i in req_json.get("inputs", []):
+            if i["secret"].startswith('["HTLC"') and "preimage" not in json.loads(i.get("witness") or "{}"):
+                return JSONResponse({"detail": "Secret is not a HTLC secret", "code": 10000}, 400)
+
+    if path == "/v1/mint/quote/bolt11" and request.method == "POST" and on("quote_lock_ignore") and req_json:
+        req_json.pop("pubkey", None)
+        body = json.dumps(req_json).encode()
+
     r = await upstream.request(request.method, path, content=body,
                                headers={"content-type": request.headers.get("content-type", "application/json")})
     try:
@@ -145,6 +191,11 @@ async def handle(request: Request):
         data["state"], data["paid"] = "UNPAID", False
     if path == "/v1/info" and on("info_lie"):
         data["nuts"]["7"] = {"supported": True}
+    if path.startswith("/v1/mint/quote/bolt11") and on("quote_lock_ignore") and status == 200:
+        if request.method == "POST" and json.loads(await request.body() or b"{}").get("pubkey"):
+            state.setdefault("locked_quotes", {})[data["quote"]] = json.loads(await request.body())["pubkey"]
+        if data.get("quote") in state.get("locked_quotes", {}):
+            data["pubkey"] = state["locked_quotes"][data["quote"]]  # pretend the lock was kept
 
     # ---- issuing ------------------------------------------------------------
     if path == "/v1/mint/bolt11":
@@ -156,8 +207,10 @@ async def handle(request: Request):
     if path == "/v1/swap" and status >= 400:
         inputs = req_json.get("inputs", [])
         locked = any(i["secret"].startswith(('["P2PK"', '["HTLC"')) for i in inputs)
+        sig_all = any('"SIG_ALL"' in i["secret"] for i in inputs)
         override = (
             (on("lock_bypass") and locked)
+            or (on("sigall_ignore") and sig_all)
             or (on("double_spend") and code in (11001, 11007))
             # spec says 11005; Nutshell 0.21 sends the generic 11000 with "not balanced"
             or (on("overspend") and not locked and (code == 11005 or "balanced" in str(data.get("detail"))))
@@ -186,7 +239,8 @@ def main():
     a = ap.parse_args()
     state["modes"] = {m for m in a.modes.split(",") if m}
     upstream = httpx.AsyncClient(base_url=a.upstream, timeout=30)
-    app = Starlette(routes=[Route("/{path:path}", handle, methods=["GET", "POST"])])
+    app = Starlette(routes=[WebSocketRoute("/v1/ws", relay_ws),
+                            Route("/{path:path}", handle, methods=["GET", "POST"])])
     uvicorn.run(app, host="127.0.0.1", port=a.port, log_level="warning")
 
 

@@ -185,3 +185,13 @@ def test_failed_funding_attempt_stops_carry(tmp_path):
     feed, out = _feed(tmp_path, [_funded_b, no_invoice, _free_only])
     assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None
     assert "Incomplete: the mint could not create a Lightning invoice" in (out / "index.html").read_text()
+
+
+def test_phrases_say_which_way_a_lock_check_failed():
+    from nutcheck.site import phrase_for
+    assert phrase_for({"id": "p2pk.sig_all", "severity": "high"}) == "SIG_ALL signatures don't protect the outputs"
+    assert phrase_for({"id": "p2pk.sig_all", "severity": "medium"}) == "Refuses valid SIG_ALL spends"
+    assert phrase_for({"id": "htlc.refund", "severity": "medium"}) == "HTLC refunds don't work after locktime"
+    assert phrase_for({"id": "htlc.hashlock", "severity": "medium"}) == "Refuses valid HTLC spends"
+    assert phrase_for({"id": "htlc.hashlock", "severity": "critical"}) == "Ignores HTLC spending conditions"
+    assert phrase_for({"id": "mint.quote_lock", "severity": "medium"}) == "Refuses correctly signed locked quotes"

@@ -3,7 +3,7 @@ name = "nutcheck"
 version = "0.1.0"
 description = "SSL Labs for Cashu mints: grade whether a mint behaves as the NUTs require"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.25"]
+dependencies = ["httpx>=0.25", "websockets>=13"]
 license = { file = "LICENSE" }
 
 [project.optional-dependencies]

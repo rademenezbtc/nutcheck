@@ -67,6 +67,22 @@
       "url": "https://github.com/cashubtc/nutshell/pull/1008",
       "link_text": "Nutshell PR #1008",
       "label": "fixed in Nutshell 0.21.0: upgrade"
+    },
+    {
+      "check": "htlc.refund",
+      "software": "cdk-mintd",
+      "text": "CDK 0.18.x reads a witness without a preimage as a P2PK witness, so it refuses the HTLC refund path (the refund key's signature alone, after the locktime). Fixed on CDK main in #2641 (October 2026), not yet in a release; a backport is requested in cdk#2980. Found by Mintprobe.",
+      "url": "https://github.com/cashubtc/cdk/issues/2980",
+      "link_text": "CDK issue #2980",
+      "label": "fixed on CDK main, upgrade when released"
+    },
+    {
+      "check": "ws.subscribe",
+      "software": "cdk-mintd",
+      "text": "CDK doesn't send the first notification for a proof it has never seen, although NUT-17 requires the current state (UNSPENT) first. A fix is in review in cdk#2983. Found by Mintprobe.",
+      "url": "https://github.com/cashubtc/cdk/pull/2983",
+      "link_text": "CDK PR #2983",
+      "label": "CDK fix in review"
     }
   ],
   "nwc_max_sat_per_run": 1000,

@@ -51,16 +51,26 @@ FAIL_PHRASE = {
     "transport.https": "Served without HTTPS",
     "p2pk.refund": "Refund keys don't work after locktime",
     "p2pk.malformed": "Accepts P2PK locks with duplicated tags",
+    "p2pk.sig_all": "SIG_ALL signatures don't protect the outputs",
+    "htlc.locktime": "Lets the HTLC refund key spend before locktime",
+    "htlc.refund": "HTLC refunds don't work after locktime",
+    "mint.quote_lock": "Mints locked quotes without their signature",
+    "ws.subscribe": "WebSocket subscriptions don't work as advertised",
+}
+# The same check can fail the other way: refusing something valid. Those failures are medium severity.
+REFUSES_VALID = {
+    "p2pk.sig_all": "Refuses valid SIG_ALL spends",
+    "mint.quote_lock": "Refuses correctly signed locked quotes",
 }
 BLURB = {
     "Keys": "Valid keys, one per amount, keyset IDs re-derive",
     "Forgery": "Ecash with a made-up signature is refused",
     "DLEQ": "DLEQ proofs on every signature (mint, swap, change)",
-    "Issuing": "Paid quotes issue the full amount, once",
+    "Issuing": "Paid quotes issue the full amount, once; locked quotes need their key",
     "Spending": "No overspend or double spend, advertised fee is the real fee",
-    "Locks": "P2PK and HTLC conditions enforced",
+    "Locks": "P2PK, SIG_ALL and HTLC conditions enforced, refunds work",
     "Payouts": "Melt pays, overpaid fees returned",
-    "Info": "HTTPS, info page honest, claimed features work",
+    "Info": "HTTPS, info page honest, claimed features (incl. WebSocket) work",
 }
 
 
@@ -83,14 +93,17 @@ def _lc(s: str) -> str:
 
 def phrase_for(r: dict) -> str:
     rid = r["id"]
+    if rid in REFUSES_VALID and r["severity"] == "medium":
+        return REFUSES_VALID[rid]
     if rid in FAIL_PHRASE:
         return FAIL_PHRASE[rid]
     if rid.startswith("dleq."):
         return "Invalid DLEQ proofs" if r["severity"] == "critical" else "No DLEQ proofs despite claiming NUT-12"
-    if rid.startswith("p2pk."):
-        return "Ignores P2PK spending conditions"
-    if rid.startswith("htlc."):
-        return "Ignores HTLC spending conditions"
+    if rid.startswith(("p2pk.", "htlc.")):
+        kind = "P2PK" if rid.startswith("p2pk.") else "HTLC"
+        if r["severity"] == "medium":  # a "must accept" control failed: the valid spend was refused
+            return f"Refuses valid {kind} spends"
+        return f"Ignores {kind} spending conditions"
     return f"Failed: {r['title']}"
 
 

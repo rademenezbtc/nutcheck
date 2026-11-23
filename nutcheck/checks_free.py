@@ -1,7 +1,9 @@
 """Checks that cost nothing: they read public endpoints or submit invalid data the mint must refuse."""
 from __future__ import annotations
 
+import json
 import time
+import uuid
 from urllib.parse import urlparse
 
 from . import crypto, secp
@@ -181,4 +183,70 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
         ("Info page advertises features that do not work: " + "; ".join(dead)) if dead
         else "Every probed claim answered",
     ))
+
+    if claimed(info, "17"):
+        out.append(websocket_check(client, info))
     return out, info
+
+
+def ws_commands(info: dict) -> set[str]:
+    sup = info.get("nuts", {}).get("17", {}).get("supported", [])
+    return {c for m in sup if isinstance(m, dict) for c in m.get("commands", [])} if isinstance(sup, list) else set()
+
+
+def websocket_check(client: MintClient, info: dict, timeout: float = 8.0) -> Result:
+    """NUT-17: the advertised websocket answers, and a new subscription first gets the current state.
+    Subscribes to a proof that has never existed: the mint must reply OK, then notify UNSPENT."""
+    rid, title = "ws.subscribe", "WebSocket subscriptions work"
+    url = client.url.replace("https://", "wss://", 1).replace("http://", "ws://", 1) + "/v1/ws"
+
+    def result(status, summary, **ev):
+        return Result(rid, title, "17", S.LOW, status, summary, evidence={"url": url, **ev})
+
+    try:
+        from websockets.exceptions import InvalidStatus, WebSocketException
+        from websockets.sync.client import connect
+    except ImportError:
+        return result(St.SKIP, "Needs the `websockets` package")
+    y = secp.encode_hex(crypto.hash_to_curve(crypto.random_secret().encode()))
+    sub_id = str(uuid.uuid4())
+    req = {"jsonrpc": "2.0", "id": 0, "method": "subscribe",
+           "params": {"kind": "proof_state", "filters": [y], "subId": sub_id}}
+    seen: list = []
+    try:
+        with connect(url, open_timeout=timeout, close_timeout=2,
+                     additional_headers={"User-Agent": "Mozilla/5.0"}) as ws:
+            if "proof_state" not in ws_commands(info):
+                return result(St.PASS, "WebSocket connects (proof_state is not advertised, so subscriptions "
+                                       "were not tested)")
+            ws.send(json.dumps(req))
+            deadline = time.monotonic() + timeout
+            acked = False
+            while time.monotonic() < deadline:
+                try:
+                    msg = json.loads(ws.recv(timeout=max(deadline - time.monotonic(), 0.1)))
+                except TimeoutError:
+                    break
+                seen.append(msg)
+                if msg.get("id") == 0 and "error" in msg:
+                    return result(St.FAIL, f"Subscription refused: {msg['error']}", messages=seen)
+                if msg.get("id") == 0 and (msg.get("result") or {}).get("status") == "OK":
+                    acked = True
+                if msg.get("method") == "subscribe" and (msg.get("params") or {}).get("subId") == sub_id:
+                    state = (msg["params"].get("payload") or {}).get("state")
+                    if state == "UNSPENT":
+                        return result(St.PASS, "Subscribed to a never-seen proof: got OK, then its current state "
+                                               "(UNSPENT)" + ("" if acked else ", though without the OK first"))
+                    return result(St.FAIL, f"First notification for a never-seen proof says {state!r}, "
+                                           "expected UNSPENT", messages=seen)
+            if not acked:
+                return result(St.FAIL, f"No answer to a proof_state subscription within {timeout:.0f}s",
+                              messages=seen)
+            return result(St.FAIL, "Subscription accepted, but the mint never sent the current state. NUT-17 says it "
+                                   "MUST notify the current state first (UNSPENT for a never-seen proof); wallets "
+                                   "waiting for it hang until they fall back to polling.", messages=seen)
+    except InvalidStatus as e:
+        code = e.response.status_code
+        return result(St.FAIL, f"Info page advertises NUT-17, but the WebSocket answers HTTP {code}", http_status=code)
+    except (OSError, TimeoutError, WebSocketException) as e:
+        return result(St.ERROR, f"Could not reach the WebSocket: {e}")

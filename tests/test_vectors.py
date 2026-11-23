@@ -114,3 +114,44 @@ def test_keyset_ids_from_spec():
             assert crypto.keyset_id_v1(keys) == kid
         else:
             assert crypto.keyset_id_v2(keys, unit, fee, expiry) == kid
+
+
+def _out(amount, B_):
+    from types import SimpleNamespace
+    return SimpleNamespace(amount=amount, blinded=SimpleNamespace(B_hex=B_))
+
+
+def test_sig_all_message():
+    # NUT-11 SIG_ALL vector (tests/11-test.md)
+    from nutcheck.checks_funded import sig_all_message
+    from nutcheck.wallet import Proof
+    secret = ('["P2PK",{"nonce":"c7f280eb55c1e8564e03db06973e94bc9b666d9e1ca42ad278408fe625950303","data":'
+              '"030d8acedfe072c9fa449a1efe0817157403fbec460d8e79f957966056e5dd76c1","tags":[["sigflag","SIG_ALL"]]}]')
+    p = Proof(2, "00bfa73302d12ffd", secret, "02c97ee3d1db41cf0a3ddb601724be8711a032950811bf326f8219c50c4808d3cd")
+    msg = sig_all_message([p], [_out(2, "038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39")])
+    assert hashlib.sha256(msg.encode()).hexdigest() == "de7f9e3ca0fcc5ed3258fcf83dbf1be7fa78a5ed6da7bf2aa60d61e9dc6eb09a"
+    sig = bytes.fromhex("ce017ca25b1b97df2f72e4b49f69ac26a240ce14b3690a8fe619d41ccc42d3c1"
+                        "282e073f85acd36dc50011638906f35b56615f24e4d03e8effe8257f6a808538")
+    pub = bytes.fromhex("030d8acedfe072c9fa449a1efe0817157403fbec460d8e79f957966056e5dd76c1")[1:]
+    assert secp.schnorr_verify(hashlib.sha256(msg.encode()).digest(), pub, sig)
+
+
+def test_nut20_message():
+    # NUT-20 vector (tests/20-test.md): pubkey of secret key 1
+    from nutcheck.checks_funded import nut20_message
+    quote = "0192d3c0-7e8a-7c3d-8e9f-1a2b3c4d5e6f"
+    outs = [_out(1, "036d6caac248af96f6afa7f904f550253a0f3ef3f5aa2fe6838a95b216691468e2"),
+            _out(1, "021f8a566c205633d029094747d2e18f44e05993dda7a5f88f496078205f656e59")]
+    msg = nut20_message(quote, outs)
+    assert msg.hex() == (
+        "43617368755f4d696e7451756f74655369675f76310000002430313932643363302d376538612d376333642d386539662d3161"
+        "32623363346435653666000000010100000021036d6caac248af96f6afa7f904f550253a0f3ef3f5aa2fe6838a95b216691468"
+        "e2000000010100000021021f8a566c205633d029094747d2e18f44e05993dda7a5f88f496078205f656e59")
+    digest = hashlib.sha256(msg).digest()
+    assert digest.hex() == "c164fd384879f74ab6ea2e7cf13d90ed42e6df9d5de607eeb5c9cc7d36fb1c21"
+    sig = bytes.fromhex("4881093a332ff7c79f3e598ce5b249d64978b47165a0b19c18adf0ced0246228"
+                        "e61e702f0abaf1bf27b92be4336bdbabacfbe4c914076386b3c66fdcd0b3480e")
+    assert secp.schnorr_verify(digest, bytes.fromhex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"), sig)
+    # and our signer produces signatures that verify against the same digest
+    k = secp.PrivateKey(1)
+    assert secp.schnorr_verify(digest, bytes.fromhex(k.pubkey_hex)[1:], bytes.fromhex(k.sign(msg)))
