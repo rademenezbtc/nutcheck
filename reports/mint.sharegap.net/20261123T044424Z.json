@@ -1,0 +1,202 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.sharegap.net",
+  "slug": "mint.sharegap.net",
+  "started": "2026-11-23T04:44:24+00:00",
+  "duration_s": 24.6,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 9,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "nutcheck.crash"
+  ],
+  "spent_sat": 0,
+  "requests": 7,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Nostrodomo Mint",
+    "pubkey": "02c251831aaa80c93eb54203934cba411fb58c57d4c5250ccda56d1adbd899afd2",
+    "version": "Nutshell/0.20.3",
+    "description": "Cashu mint for AI agents",
+    "contact": [],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "00c98664459d1023",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Nostrodomo Mint' running Nutshell/0.20.3",
+      "funded": false,
+      "evidence": {
+        "name": "Nostrodomo Mint",
+        "version": "Nutshell/0.20.3",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "64 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 00c98664459d\u2026 fee 100 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Subscribed to a never-seen proof: got OK, then its current state (UNSPENT)",
+      "funded": false,
+      "evidence": {
+        "url": "wss://mint.sharegap.net/v1/ws"
+      },
+      "category": "Info"
+    },
+    {
+      "id": "nutcheck.crash",
+      "title": "NutCheck completed",
+      "nut": "-",
+      "severity": "info",
+      "status": "error",
+      "summary": "ReadTimeout: The read operation timed out",
+      "funded": false,
+      "evidence": {
+        "trace": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/nutcheck/client.py\", line 76, in _send\n    return self._http.request(method, self.url + path, json=body,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_client.py\", line 825, in request\n    return self.send(request, auth=auth, follow_redirects=follow_redirects)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_client.py\", line 914, in send\n    response = self._send_handling_auth(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_client.py\", line 942, in _send_handling_auth\n    response = self._send_handling_redirects(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_client.py\", line 979, in _send_handling_redirects\n    response = self._send_single_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_client.py\", line 1014, in _send_single_request\n    response = transport.handle_request(request)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_transports/default.py\", line 249, in handle_request\n    with map_httpcore_exceptions():\n         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/contextlib.py\", line 158, in __exit__\n    self.gen.throw(value)\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/httpx/_transports/default.py\", line 118, in map_httpcore_exceptions\n    raise mapped_exc(message) from exc\nhttpx.ReadTimeout: The read operation timed out\n"
+      },
+      "category": "Info"
+    }
+  ],
+  "funding": {
+    "source": "nwc",
+    "paid_in": 0,
+    "funded": false,
+    "carried_in": 0,
+    "leftover": 0,
+    "returned": 0,
+    "melt_fee": 0,
+    "dust": 0,
+    "ok": true
+  }
+}

@@ -1,0 +1,509 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://m7.mountainlake.io",
+  "slug": "m7.mountainlake.io",
+  "started": "2026-11-23T04:52:56+00:00",
+  "duration_s": 23.3,
+  "reachable": true,
+  "grade": "B",
+  "partial": false,
+  "reasons": [
+    "WebSocket subscriptions work (low) \u2192 capped at A-",
+    "Malformed lock (duplicate tag) rejected (medium) \u2192 capped at B",
+    "HTLC refund works after locktime (medium) \u2192 capped at B"
+  ],
+  "counts": {
+    "pass": 30,
+    "fail": 3,
+    "warn": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "errors": [],
+  "spent_sat": 13,
+  "requests": 49,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Mountainlake M7",
+    "pubkey": "02f9e6a53065594ec71dcbb828fb949b482b60ac959fd8ca6be49a8f40822c9256",
+    "version": "cdk-mintd/0.18.2",
+    "description": "A mint for bitcoiners & friends",
+    "contact": [
+      {
+        "method": "email",
+        "info": "m7@mountainlake.io"
+      }
+    ],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "01865a671ec1eb3a3ac82e204ac088d08e5a1a53645c246613ac72d1156f4de0de",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Mountainlake M7' running cdk-mintd/0.18.2",
+      "funded": false,
+      "evidence": {
+        "name": "Mountainlake M7",
+        "version": "cdk-mintd/0.18.2",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "32 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 01865a671ec1\u2026 fee 100 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "fail",
+      "summary": "Subscription accepted, but the mint never sent the current state. NUT-17 says it MUST notify the current state first (UNSPENT for a never-seen proof); wallets waiting for it hang until they fall back to polling.",
+      "funded": false,
+      "evidence": {
+        "url": "wss://m7.mountainlake.io/v1/ws",
+        "messages": [
+          {
+            "id": 0,
+            "jsonrpc": "2.0",
+            "result": {
+              "status": "OK",
+              "subId": "ed7f01be-2b76-45ce-a905-45bfb9dd94bc"
+            }
+          }
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "mint.requires_payment",
+      "title": "Issues ecash only for paid invoices",
+      "nut": "04",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "The funding quote stayed unpaid until NutCheck paid the invoice",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    },
+    {
+      "id": "mint.issue",
+      "title": "Paid quote issues the full amount",
+      "nut": "04",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Paid 64, received 64 in 7 signatures",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    },
+    {
+      "id": "dleq.mint",
+      "title": "DLEQ proofs valid on mint",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "7 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    },
+    {
+      "id": "mint.quote_replay",
+      "title": "Quote cannot be minted twice",
+      "nut": "04",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Second mint on the same quote refused (20002)",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    },
+    {
+      "id": "swap.no_overspend",
+      "title": "Rejects outputs worth more than inputs",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Swap creating 1 sat out of nothing refused (11005)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "swap.fee_exact",
+      "title": "Swap at the advertised fee succeeds",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 inputs, 100 ppk \u2192 1 sat fee, accepted",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "dleq.swap",
+      "title": "DLEQ proofs valid on swap",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "5 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    },
+    {
+      "id": "swap.double_spend",
+      "title": "Rejects double spends",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Re-spending used proofs refused (11001)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "swap.duplicate_input",
+      "title": "Rejects the same proof twice in one request",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Duplicated input refused (11007)",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "checkstate.spent",
+      "title": "Spent proofs are reported as spent",
+      "nut": "07",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "All spent proofs report SPENT",
+      "funded": true,
+      "evidence": {},
+      "category": "Spending"
+    },
+    {
+      "id": "p2pk.basic",
+      "title": "P2PK lock enforced",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: no signature, empty witness, signature from the wrong key; accepted: signature from the locking key",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.multisig",
+      "title": "P2PK 2-of-2 multisig enforced",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: 1 of 2 signatures, the same key signing twice; accepted: 2 of 2 signatures",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.locktime",
+      "title": "Refund key blocked before locktime",
+      "nut": "11",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: refund key before locktime; accepted: locking key",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.refund",
+      "title": "Refund key works after locktime",
+      "nut": "11",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "Refund key spent the expired lock",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.malformed",
+      "title": "Malformed lock (duplicate tag) rejected",
+      "nut": "11",
+      "severity": "medium",
+      "status": "fail",
+      "summary": "Accepted a P2PK secret with two locktime tags. NUT-11 says a duplicated tag makes the secret malformed and it MUST be rejected. Wallets and mints that read different copies of the tag disagree on when the refund key can spend, so a refund could open earlier than the receiver expects.",
+      "funded": true,
+      "evidence": {
+        "lock": "[\"P2PK\", {\"nonce\": \"\\u2026\", \"data\": \"02ad70d5\\u2026d2b638\", \"tags\": [[\"locktime\", \"1795495992\"], [\"locktime\", \"1795409593\"]]}]",
+        "exchange": {
+          "method": "POST",
+          "path": "/v1/swap",
+          "status": 200,
+          "request": {
+            "inputs": "[1 proofs, 2 sat]",
+            "outputs": "[1 outputs]"
+          },
+          "response": {
+            "signatures": "[1 signatures]"
+          },
+          "ms": 145
+        }
+      },
+      "category": "Locks"
+    },
+    {
+      "id": "p2pk.sig_all",
+      "title": "SIG_ALL signature covers the outputs",
+      "nut": "11",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Refused: a separate signature on each input's secret (SIG_INPUTS style); a SIG_ALL signature whose outputs were swapped after signing; accepted: one SIG_ALL signature over all inputs and outputs, in the first input",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.hashlock",
+      "title": "HTLC hash lock enforced",
+      "nut": "14",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: no preimage, wrong preimage; accepted: correct preimage",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.receiver_sig",
+      "title": "HTLC receiver signature enforced",
+      "nut": "14",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: preimage without the receiver's signature, preimage with the wrong signature; accepted: preimage and receiver signature",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.locktime",
+      "title": "HTLC refund key blocked before locktime",
+      "nut": "14",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Refused: refund key before locktime, no preimage; accepted: preimage and receiver signature",
+      "funded": true,
+      "evidence": {},
+      "category": "Locks"
+    },
+    {
+      "id": "htlc.refund",
+      "title": "HTLC refund works after locktime",
+      "nut": "14",
+      "severity": "medium",
+      "status": "fail",
+      "summary": "Refund key could not spend an expired HTLC without a preimage: HTTP 400 code=50000 Secret is not a HTLC secret. NUT-14 lets the sender reclaim with the refund signature alone once the locktime passes; on this mint a sender whose payment was never claimed cannot get it back.",
+      "funded": true,
+      "evidence": {
+        "lock": "[\"HTLC\", {\"nonce\": \"\\u2026\", \"data\": \"1be7253f\\u202671cd62\", \"tags\": [[\"pubkeys\", \"02ad70d5\\u2026d2b638\"], [\"locktime\", \"1795323192\"], [\"refund\", \"03703770\\u202667bfb8\"]]}]",
+        "exchange": {
+          "method": "POST",
+          "path": "/v1/swap",
+          "status": 200,
+          "request": {
+            "inputs": "[1 proofs, 2 sat]",
+            "outputs": "[1 outputs]"
+          },
+          "response": {
+            "signatures": "[1 signatures]"
+          },
+          "ms": 182
+        }
+      },
+      "category": "Locks"
+    },
+    {
+      "id": "melt.pays",
+      "title": "Melt pays the invoice",
+      "nut": "05",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Melt state: PAID (fee_reserve 3)",
+      "funded": true,
+      "evidence": {},
+      "category": "Payouts"
+    },
+    {
+      "id": "melt.fee_return",
+      "title": "Overpaid fees are returned",
+      "nut": "08",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Overpaid by 15 sat (internal payment, no Lightning fee); 15 sat returned as change",
+      "funded": true,
+      "evidence": {
+        "fee_reserve": 3,
+        "inputs": 24,
+        "input_fee": 1,
+        "quote_amount": 8,
+        "returned": 15
+      },
+      "category": "Payouts"
+    },
+    {
+      "id": "dleq.melt_change",
+      "title": "DLEQ proofs valid on melt_change",
+      "nut": "12",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "4 DLEQ proof(s) verified",
+      "funded": true,
+      "evidence": {},
+      "category": "DLEQ"
+    },
+    {
+      "id": "mint.quote_lock",
+      "title": "Locked mint quote needs its signature",
+      "nut": "20",
+      "severity": "high",
+      "status": "pass",
+      "summary": "Refused: no signature, a signature from the wrong key; accepted: the quote key's signature",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    }
+  ],
+  "funding": {
+    "source": "nwc",
+    "paid_in": 67,
+    "funded": true,
+    "carried_in": 1,
+    "leftover": 52,
+    "returned": 46,
+    "melt_fee": 5,
+    "dust": 1,
+    "ok": true,
+    "change_kept": 1
+  }
+}
