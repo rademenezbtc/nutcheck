@@ -1,0 +1,55 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.hashu.io",
+  "slug": "mint.hashu.io",
+  "started": "2026-11-23T02:48:09+00:00",
+  "duration_s": 0.4,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 0,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "nutcheck.crash"
+  ],
+  "spent_sat": 0,
+  "requests": 3,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": null,
+    "pubkey": null,
+    "version": null,
+    "description": null,
+    "contact": null,
+    "nuts": [],
+    "keysets": [
+      {
+        "id": "019516987aad0c4edb29dfb0e105b3fc9243254e2575fde39a9125a5d75cf5cff9",
+        "unit": "tih",
+        "active": true,
+        "input_fee_ppk": 0
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "nutcheck.crash",
+      "title": "NutCheck completed",
+      "nut": "-",
+      "severity": "info",
+      "status": "error",
+      "summary": "RuntimeError: mint has no active sat keyset",
+      "funded": false,
+      "evidence": {
+        "trace": "Traceback (most recent call last):\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/nutcheck/cli.py\", line 52, in audit\n    free, info = checks_free.run(client, wallet)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/nutcheck/checks_free.py\", line 147, in run\n    outs = wallet.outputs([amt])\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/nutcheck/wallet.py\", line 95, in outputs\n    ks = self.active\n         ^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.12.16/x64/lib/python3.12/site-packages/nutcheck/wallet.py\", line 87, in active\n    raise RuntimeError(f\"mint has no active {self.unit} keyset\")\nRuntimeError: mint has no active sat keyset\n"
+      },
+      "category": "Info"
+    }
+  ]
+}
