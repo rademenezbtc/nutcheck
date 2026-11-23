@@ -1,0 +1,200 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.sharegap.net",
+  "slug": "mint.sharegap.net",
+  "started": "2026-11-23T16:03:01+00:00",
+  "duration_s": 24.9,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 9,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "nutcheck.inconclusive"
+  ],
+  "spent_sat": 0,
+  "requests": 7,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Nostrodomo Mint",
+    "pubkey": "02c251831aaa80c93eb54203934cba411fb58c57d4c5250ccda56d1adbd899afd2",
+    "version": "Nutshell/0.20.3",
+    "description": "Cashu mint for AI agents",
+    "contact": [],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "00c98664459d1023",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 100
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Nostrodomo Mint' running Nutshell/0.20.3",
+      "funded": false,
+      "evidence": {
+        "name": "Nostrodomo Mint",
+        "version": "Nutshell/0.20.3",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "64 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 00c98664459d\u2026 fee 100 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Subscribed to a never-seen proof: got OK, then its current state (UNSPENT)",
+      "funded": false,
+      "evidence": {
+        "url": "wss://mint.sharegap.net/v1/ws"
+      },
+      "category": "Info"
+    },
+    {
+      "id": "nutcheck.inconclusive",
+      "title": "Mint answered every request",
+      "nut": "-",
+      "severity": "info",
+      "status": "error",
+      "summary": "Run incomplete: POST /v1/mint/quote/bolt11: no answer in time. The remaining checks were not run. This is not a mark against the mint; it usually means the mint was busy or limits how fast one client may send requests.",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    }
+  ],
+  "funding": {
+    "source": "nwc",
+    "paid_in": 0,
+    "funded": false,
+    "carried_in": 0,
+    "leftover": 0,
+    "returned": 0,
+    "melt_fee": 0,
+    "dust": 0,
+    "ok": true
+  }
+}
