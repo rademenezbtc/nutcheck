@@ -26,10 +26,6 @@
       "funded": "nwc"
     },
     {
-      "url": "https://8333.space:3338",
-      "funded": "nwc"
-    },
-    {
       "url": "https://mint.agorist.space",
       "funded": "nwc"
     },
@@ -56,10 +52,6 @@
     {
       "url": "https://antifiat.cash",
       "funded": "nwc"
-    },
-    {
-      "url": "https://bb.mountainlake.io/cashu/api/v1/WpczZwvNES7wMa8ForKGmh",
-      "funded": false
     },
     {
       "url": "https://cashu.21m.lol",
@@ -199,10 +191,6 @@
     },
     {
       "url": "https://mint.ucash.space",
-      "funded": "nwc"
-    },
-    {
-      "url": "https://mint.unclerics.cash",
       "funded": "nwc"
     }
   ],
