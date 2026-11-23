@@ -248,12 +248,20 @@ class MintView:
         """Kept for older callers: ' · paid checks not run (why)', or '' when they ran."""
         return f" · paid checks not run ({self.paid_reason})" if self.latest.get("partial") else ""
 
-    def lines_html(self, sep: str = "<br>") -> str:
+    def lines_html(self) -> str:
+        """Two lines, each led by the same mark as the category columns: ✓ passed, ✗ failed,
+        ! warnings or incomplete, – not run."""
         if self.grade == "—":
             return ""
         (fw, fh), (pw, ph) = self.free_line, self.paid_line
-        paid = f"Paid checks · {pw} · {ph}" if pw else f"Paid checks · {ph}"
-        return f"Free checks · {escape(fw)} · {escape(fh)}{sep}{escape(paid)}"
+        out = []
+        for label, when, how in (("Free checks", fw, fh), ("Paid checks", pw, ph)):
+            state = ("s" if how.startswith("not run") else "p" if how == "passed"
+                     else "f" if "failed" in how else "w")
+            text = " · ".join(x for x in (label, when, how) if x)
+            out.append(f'<div class="rl"><span class="ri {state}" role="img" aria-label="{WORD[state]}">'
+                       f'{ICONS[state]}</span><span>{escape(text)}</span></div>')
+        return "".join(out)
 
     def tip(self, cat: str, state: str) -> str:
         """Tooltip for one category mark: what was checked, and what went wrong if anything."""
@@ -391,7 +399,7 @@ nav.main a[aria-current]{background:#EEF0FB;color:#2E3FB8;font-weight:600}
 .btn.line{border:1px solid #D6D6D0;color:#15171C;background:#fff}
 main{padding:40px 0 64px;display:flex;flex-direction:column;gap:28px}
 .card{background:#fff;border:1px solid #E3E3DE;border-radius:16px}
-.muted{color:#5A5F6B}.small{font-size:13px}.runs{margin-top:2px;line-height:1.45}
+.muted{color:#5A5F6B}.small{font-size:13px}.runs{margin-top:4px;line-height:1.45;display:flex;flex-direction:column;gap:3px}.rl{display:flex;align-items:flex-start;gap:6px}.ri{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:5px;margin-top:1px}.ri svg{width:12px;height:12px}.ri.p{background:#E7F4EE}.ri.f{background:#FBE3DC}.ri.w{background:#FCEFD6}.ri.s{background:#F1F1EE}
 .hero{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-end}
 .hero h1{margin:0 0 12px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .hero p{margin:0;font-size:17px;color:#4A4F5B;max-width:680px}
