@@ -118,6 +118,18 @@ def save_report(report: dict, reports_dir: Path) -> Path:
     return p
 
 
+def last_funded(mint_dir: Path) -> str:
+    """When this mint last got paid checks with real sats ('' if never, which sorts first)."""
+    for p in sorted(mint_dir.glob("*.json"), reverse=True)[:60]:
+        try:
+            r = json.loads(p.read_text())
+        except (OSError, ValueError):
+            continue
+        if (r.get("funding") or {}).get("paid_in"):
+            return r["started"]
+    return ""
+
+
 def save_leftover(wallet: Wallet, path: Path):
     """Leftover ecash is spendable by whoever holds the file: never inside a published directory."""
     if wallet.proofs:
@@ -224,6 +236,10 @@ def cmd_sweep(argv):
         try:
             report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
                                    on_invoice=on_invoice, preload=preload, expect_payment=(mode == "nwc"))
+            if mode == "nwc" and funder is not None and not free_run and not held and not use_nwc:
+                report["results"].append(Result(
+                    "mint.funded", "Funding invoice paid", "04", Severity.INFO, Status.SKIP,
+                    f"Not funded: funding stopped earlier in this run ({funder.stopped})", funded=True).to_dict())
             if held:
                 report["results"].append(Result(
                     "mint.funded", "Funding invoice paid", "04", Severity.INFO, Status.SKIP,
@@ -256,6 +272,8 @@ def cmd_sweep(argv):
         print(f"{report['grade']:<3} {slug:<40} {'partial ' if report['partial'] else ''}→ {path}{fund_note}", flush=True)
 
     todo = [m for m in cfg["mints"] if not a.only or mint_slug(m["url"]) in a.only]
+    if funder:  # mints that have waited longest for paid checks go first, so a stop never starves the same ones
+        todo.sort(key=lambda m: last_funded(reports_dir / mint_slug(m["url"])))
     if a.jobs > 1:  # each mint is a different server, so testing several at once doesn't load any one of them
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=a.jobs) as pool:

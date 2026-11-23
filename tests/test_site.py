@@ -217,3 +217,16 @@ def test_scorecard_shows_the_last_seven_runs(tmp_path):
     html = (out / "index.html").read_text()
     assert "Last 7 runs" in html and "Grades over the last 7 runs" in html
     assert "Grades over the last 10 runs" in (out / "mints" / "127.0.0.1_3399.html").read_text()
+
+
+def test_low_failures_get_the_amber_mark_and_say_low():
+    from nutcheck.site import MintView
+    r = _report("m", "https://m.example", T0)
+    r["results"].append({"id": "ws.subscribe", "title": "WebSocket", "nut": "17", "severity": "low",
+                         "status": "fail", "summary": "silent", "funded": False, "evidence": {}, "category": "Info"})
+    r["partial"], r["grade"] = True, "A-"
+    v = MintView({"url": "https://m.example", "funded": "nwc"}, "m", [r], r)
+    assert v.free_line[1] == "1 failed (low)"
+    html = v.lines_html()
+    assert 'aria-label="warning">' in html and 'aria-label="failed">' not in html
+    assert "Paid checks · not run yet" in html  # never funded so far

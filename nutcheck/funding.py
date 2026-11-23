@@ -34,6 +34,10 @@ MIN_PAYBACK_SAT = 3
 RECOVER_NOW_SAT = 20  # smaller stashes are folded into that mint's next funded run instead
 PAYBACK_MELT_TIMEOUT = 90  # a melt answers only once its Lightning payment settles, which can take a while
 PAYBACK_SETTLE_WAIT = 120  # after a timeout or PENDING, keep asking the mint how the payment ended
+# NWC error codes that mean the wallet itself can't pay anything right now (as opposed to one invoice failing)
+WALLET_DOWN = {"INSUFFICIENT_BALANCE", "QUOTA_EXCEEDED", "UNAUTHORIZED", "RESTRICTED", "RATE_LIMITED",
+               "NOT_IMPLEMENTED", "RELAY_REJECTED"}
+MAX_PAY_FAILURES = 3  # this many funding payments failing in a row looks like the wallet, not the mints
 MAX_PAYBACK_FAILURES = 3  # more than this many mints failing to pay back in one run looks like our bug: stop
 _RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError, httpx.TransportError)
 
@@ -56,6 +60,7 @@ class Funder:
         self.stopped: str | None = None
         self.alerts: list[str] = []
         self.payback_failures = 0
+        self.pay_failures = 0  # consecutive funding payments that failed
         self._lock = threading.RLock()
 
     def stop(self, reason: str):
@@ -75,9 +80,18 @@ class Funder:
                 raise FundingStopped(f"per-run cap of {self.max} sat reached")
             try:
                 res = self.nwc.pay_invoice(invoice)
-            except (NWCError, OSError, TimeoutError, ConnectionError) as e:
+            except NWCError as e:
+                self.pay_failures += 1
+                if e.code in WALLET_DOWN or self.pay_failures >= MAX_PAY_FAILURES:
+                    self.stop(f"wallet could not pay a funding invoice: {e}"
+                              + (f" ({self.pay_failures} in a row)" if e.code not in WALLET_DOWN else ""))
+                    raise FundingStopped(str(e)) from None
+                # One invoice failing (no route to that mint, say) is about that mint: skip it, fund the rest.
+                raise FundingStopped(f"the wallet could not pay this mint's invoice ({e})") from None
+            except (OSError, TimeoutError, ConnectionError) as e:
                 self.stop(f"wallet could not pay a funding invoice: {e}")
                 raise FundingStopped(str(e)) from None
+            self.pay_failures = 0
             cost = amount + (res.get("fees_paid") or 0) // 1000
             self.paid_out += cost
             return cost

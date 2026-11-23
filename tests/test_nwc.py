@@ -80,7 +80,7 @@ def test_per_run_cap(tmp_path, monkeypatch):
 
 
 def test_wallet_refuses_payment(tmp_path, monkeypatch):
-    with FakeRelayWallet(7705, proxy_url=PROXY, mint_url=MINT, fail_pay=True) as w:
+    with FakeRelayWallet(7705, proxy_url=PROXY, mint_url=MINT, fail_pay="INSUFFICIENT_BALANCE") as w:
         (rep,), alerts = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}])
     assert rep["partial"]
     assert "could not pay a funding invoice" in alerts
@@ -214,3 +214,39 @@ def test_mint_that_cannot_pay_out_does_not_stop_the_rest(tmp_path, monkeypatch):
     for rep in latest.values():
         assert rep.get("payback_pending", 0) > 0
         assert any(x["id"] == "mint.funded" and "waiting to be paid back" in x["summary"] for x in rep["results"])
+
+
+def test_one_failed_payment_skips_only_that_mint(tmp_path, monkeypatch):
+    """No route to one mint is about that mint: it's skipped, the next mint is still funded, nothing stops."""
+    other = "http://localhost:3339"
+    with FakeRelayWallet(7713, proxy_url=PROXY, mint_url=MINT, fail_pay=True, fail_pay_times=1) as w:
+        reps, alerts = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20},
+                                                         {"url": other, "funded": "nwc", "wait": 20}])
+    by = {r["mint"]: r for r in reps}
+    first = {x["id"]: x for x in by[PROXY]["results"]}["mint.funded"]
+    assert first["status"] == "skip" and "could not pay this mint" in first["summary"]
+    assert len(w.paid) == 1 and not by[other]["partial"], "the second mint was funded"
+    assert "Funding:" not in alerts
+
+
+def test_mints_left_out_say_why(tmp_path, monkeypatch):
+    mints = [{"url": PROXY, "funded": "nwc", "wait": 20}, {"url": "http://localhost:3339", "funded": "nwc", "wait": 20}]
+    with FakeRelayWallet(7714, proxy_url=PROXY, mint_url=MINT, fail_pay="INSUFFICIENT_BALANCE") as w:
+        reps, _ = _sweep(tmp_path, monkeypatch, w, mints)
+    second = {r["mint"]: r for r in reps}["http://localhost:3339"]
+    skip = {x["id"]: x for x in second["results"]}["mint.funded"]
+    assert skip["status"] == "skip" and "funding stopped earlier in this run" in skip["summary"]
+
+
+def test_mint_left_out_goes_first_next_time(tmp_path, monkeypatch):
+    from nutcheck import cli
+    a, b = {"url": PROXY, "funded": "nwc", "wait": 20}, {"url": "http://localhost:3339", "funded": "nwc", "wait": 20}
+    with FakeRelayWallet(7715, proxy_url=PROXY, mint_url=MINT, fail_pay=True, fail_pay_times=1) as w:
+        _sweep(tmp_path, monkeypatch, w, [a, b])        # a's payment fails, b is funded
+        assert cli.last_funded(tmp_path / "reports" / "127.0.0.1_3339") == ""
+        assert cli.last_funded(tmp_path / "reports" / "localhost_3339") != ""
+        order = []
+        real = cli.audit
+        monkeypatch.setattr(cli, "audit", lambda url, **k: (order.append(url), real(url, **k))[1])
+        _sweep(tmp_path, monkeypatch, w, [b, a])        # config lists b first, but a has waited longer
+    assert order == [PROXY, "http://localhost:3339"]

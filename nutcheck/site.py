@@ -38,7 +38,7 @@ FAIL_PHRASE = {
     "swap.no_overspend": "Signs more than it receives",
     "swap.double_spend": "Accepts double spends",
     "swap.duplicate_input": "Counts one proof twice",
-    "swap.fee_exact": "Charges a different fee than it advertises",
+    "swap.fee_exact": "Refuses a swap that pays its advertised fee",
     "mint.issue": "Short-changes paid quotes",
     "mint.quote_replay": "Mints the same quote twice",
     "keys.keyset_id": "Keyset IDs don't match their keys",
@@ -92,11 +92,13 @@ def fmt_short(iso: str) -> str:
 
 
 def _tally(rs: list[dict]) -> str:
-    """'passed', or what went wrong in a few words: '2 failed, 1 warning'."""
-    f = sum(r["status"] == "fail" for r in rs)
+    """'passed', or what went wrong in a few words: '2 failed, 1 warning', '1 failed (low)'."""
+    fails = [r for r in rs if r["status"] == "fail"]
+    f = len(fails)
     w = sum(r["status"] == "warn" for r in rs)
     e = sum(r["status"] == "error" for r in rs)
-    parts = ([f"{f} failed"] if f else []) + ([f"{w} warning{'s' if w > 1 else ''}"] if w else [])
+    minor = f and all(r["severity"] in ("low", "info") for r in fails)  # caps the grade at A− at most
+    parts = ([f"{f} failed" + (" (low)" if minor else "")] if f else []) + ([f"{w} warning{'s' if w > 1 else ''}"] if w else [])
     if e:
         parts.append("incomplete")
     return ", ".join(parts) or "passed"
@@ -219,7 +221,8 @@ class MintView:
         if tested:
             funded = [r for r in L["results"] if r.get("funded")]
             return fmt_short(L.get("funded_from") or L["started"]), _tally(funded)
-        return self.paid_attempt, f"not run: {self.paid_reason}"
+        why = self.paid_reason
+        return self.paid_attempt, f"not run: {why}" if why else "not run yet"
 
     @property
     def paid_attempt(self) -> str:
@@ -236,10 +239,14 @@ class MintView:
             return "free checks only for this mint"
         if any(r["id"] == "mint.funded" and "waiting to be paid back" in r["summary"] for r in L["results"]):
             return "earlier pay-back still pending"
+        if any(r["id"] == "mint.funded" and "funding stopped earlier" in r["summary"] for r in L["results"]):
+            return "funding stopped earlier in this run"
+        if any(r["id"] == "mint.funded" and "could not pay this mint" in r["summary"] for r in L["results"]):
+            return "NutCheck's wallet couldn't pay this mint"
         # A free-only run says nothing about why the paid checks are missing: ask the latest paid attempt.
         tried = L if _tried_funded(L) else next((r for r in reversed(self.reports) if _tried_funded(r)), None)
         if tried is None:
-            return "not yet"
+            return ""  # never funded so far: "not run yet"
         if any(r["id"] == "mint.requires_payment" and r["status"] == "fail" for r in tried["results"]):
             return "fake Lightning backend"
         if any(r["id"] == "mint.quote" and r["status"] == "error" for r in tried["results"]):
@@ -262,7 +269,7 @@ class MintView:
         out = []
         for label, when, how in (("Free checks", fw, fh), ("Paid checks", pw, ph)):
             state = ("s" if how.startswith("not run") else "p" if how == "passed"
-                     else "f" if "failed" in how else "w")
+                     else "f" if "failed" in how and "(low)" not in how else "w")
             text = " · ".join(x for x in (label, when, how) if x)
             out.append(f'<div class="rl"><span class="ri {state}" role="img" aria-label="{WORD[state]}">'
                        f'{ICONS[state]}</span><span>{escape(text)}</span></div>')

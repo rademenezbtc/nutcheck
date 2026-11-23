@@ -35,12 +35,14 @@ def _match(f: dict, ev: dict) -> bool:
 
 class FakeRelayWallet:
     def __init__(self, port: int, *, proxy_url: str, mint_url: str, encryption: str | None = "nip44_v2 nip04",
-                 fail_pay: bool = False, fail_make: bool = False):
+                 fail_pay: bool | str = False, fail_make: bool = False, fail_pay_times: int | None = None):
+        """fail_pay: True (PAYMENT_FAILED) or an NWC error code; fail_pay_times: only the first N payments fail."""
         self.port, self.proxy_url, self.mint_url = port, proxy_url, mint_url
         self.wallet_sec = 0xB0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0 + port
         self.wallet_pub = nostr.xonly_pub(self.wallet_sec)
         self.client_sec = 0xC11E47C11E47C11E47C11E47C11E47C11E47C11E47C11E47C11E47C11E47 + port
         self.encryption, self.fail_pay, self.fail_make = encryption, fail_pay, fail_make
+        self.fail_pay_times = fail_pay_times
         self.events: list[dict] = []
         self.subs: dict = {}
         self.paid: list[tuple[str, int]] = []
@@ -99,8 +101,11 @@ class FakeRelayWallet:
         method, params = body["method"], body.get("params", {})
         result, error = None, None
         if method == "pay_invoice":
-            if self.fail_pay:
-                error = {"code": "PAYMENT_FAILED", "message": "test: payment failed"}
+            if self.fail_pay and (self.fail_pay_times is None or self.fail_pay_times > 0):
+                if self.fail_pay_times:
+                    self.fail_pay_times -= 1
+                code = self.fail_pay if isinstance(self.fail_pay, str) else "PAYMENT_FAILED"
+                error = {"code": code, "message": "test: payment failed"}
             else:
                 inv = params["invoice"]
                 self.paid.append((inv, bolt11_sats(inv)))

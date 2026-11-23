@@ -169,7 +169,9 @@ Notes:
 - The scorecard shows each mint's last 7 runs; its own page shows up to 30.
 - If a run can't fund a mint (or a manual run skips the paid checks), its page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so a grade doesn't flip with every free-only run.
 - The scorecard only lists mints on real Lightning. A mint that marks NutCheck's invoice as paid before anyone pays it is graded F ("issues ecash for invoices nobody paid") and gets no paid checks. Test mints such as `testnut.cashu.space` are fine for trying the CLI (`--fund` still asks you to pay, but the mint pays itself), they just aren't on the scorecard.
-- A mint that can't pay NutCheck's wallet back ("Payment failed") keeps that ecash stashed and isn't funded again until it comes back; the other mints carry on. Only wallet errors, leftovers that couldn't be stashed, or repeated unexpected pay-back errors stop funding for the rest of a run.
+- A mint that can't pay NutCheck's wallet back ("Payment failed") keeps that ecash stashed and isn't funded again until it comes back; the other mints carry on. Likewise, if the wallet can't pay one mint's funding invoice, only that mint is skipped. Funding stops for the rest of a run only when the wallet itself fails (no balance, refused, unreachable), three funding payments fail in a row, a leftover can't be stashed, or pay-backs keep failing in unexpected ways.
+- Paid runs start with the mints that have waited longest for paid checks, so a run that stops early never leaves out the same mints twice.
+- Under each grade, a red ✗ means a failure that lowers the grade to B or below; an amber ! means warnings or low-severity failures only (at most A−).
 - An unresolved serious failure fails every run, so GitHub emails you up to 4 times a day until you set `"notified"`.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count. If the workflow ever shows as disabled, re-enable it in the Actions tab.
 - GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck and behave differently. That's an open problem.
@@ -182,7 +184,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 82 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 86 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -195,7 +197,7 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **16 Nov:** CDK merged the fix for the duplicate-tag issue ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888) by robwoodgate), three days after NutCheck posted evidence that every CDK mint it tests is affected.
 - **23 Nov:** four new checks: HTLC refunds after the locktime, `SIG_ALL` (the signature must cover the outputs), NUT-17 WebSocket subscriptions and NUT-20 locked mint quotes, each with a naughty-proxy fault in the CI matrix. The HTLC-refund and WebSocket checks follow issues found by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe), another Nut November mint tester ([cdk#2980](https://github.com/cashubtc/cdk/issues/2980), [cdk#2983](https://github.com/cashubtc/cdk/pull/2983)).
 - **23 Nov (later):** one grade per mint with a ✓/✗ line each for the free and the paid checks (when, and how they went) instead of the asterisk; mints from MintRadar and cashumints.space, trimmed to the 39 that answer and issue ecash on real Lightning, so every one gets the paid checks; free checks twice a day, paid daily; sweeps test six mints at a time; the scorecard shows the last 7 runs.
-- **23 Nov (evening):** fixes from the first big runs: a fake-Lightning check (ecash only for invoices that were really paid); a mint that can't pay NutCheck back no longer stops funding for the others; slow pay-backs are awaited, not counted as failures; legacy base64 keyset IDs are recognised (one mint was wrongly graded C for them); old `SIG_ALL` and NUT-20 signing formats are retried and shown as warnings.
+- **23 Nov (evening):** fixes from the first big runs: a fake-Lightning check (ecash only for invoices that were really paid); a mint that can't pay NutCheck back no longer stops funding for the others; slow pay-backs are awaited, not counted as failures; legacy base64 keyset IDs are recognised (one mint was wrongly graded C for them); old `SIG_ALL` and NUT-20 signing formats are retried and shown as warnings. After the next run: one wallet payment failing only skips that mint, and paid runs start with the mints that waited longest.
 - **Next:** a GitHub Action for operators.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.

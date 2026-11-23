@@ -119,7 +119,7 @@ def review(v, cfg: dict, seckey: int, created_at: int | None = None) -> dict:
     grade = L["grade"]
     findings = run_tip(v, L).split("\n")[1:]
     if L.get("partial"):
-        not_run = f"paid checks not run: {v.paid_reason}"
+        not_run = f"paid checks not run: {v.paid_reason}" if v.paid_reason else "paid checks not run yet"
         findings = [f"Free checks passed; {not_run}" if f == "All checks passed (free checks only)"
                     else not_run[:1].upper() + not_run[1:] if f == "Paid checks not run" else f for f in findings]
     page = cfg.get("base_url", "https://nutcheck.org/") + f"mints/{v.slug}.html"

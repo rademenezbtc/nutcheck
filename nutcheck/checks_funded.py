@@ -146,7 +146,8 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
     if err:
         ctx.add("swap.fee_exact", "Swap at the advertised fee succeeds", "02", S.HIGH, St.FAIL,
                 f"Swap paying exactly the advertised fee ({advertised} ppk → {fee} sat for {len(inputs)} inputs) "
-                f"was refused: {err}. The mint charges something other than what it advertises.")
+                f"was refused: {err}. Either the mint charges a different fee than it advertises, or it refuses "
+                "to redeem valid ecash.")
         wallet.proofs += inputs  # might still be unspent
         return ctx.results
     swapped = wallet.unblind(sigs, exact_outs)
