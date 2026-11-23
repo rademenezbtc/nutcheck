@@ -4,8 +4,11 @@ Safety rules:
 - a hard cap on sats paid out per sweep (`nwc_max_sat_per_run`, default 1000);
 - a pay-back is retried; if it still fails, the leftover ecash is stashed, encrypted with a key derived
   from the NWC secret, so it is never lost with the CI runner. The next funded sweep pays it back first;
-- after a wallet error, a pay-back that could not be stashed, or MAX_PAYBACK_FAILURES failed pay-backs,
-  no further mint is funded in that sweep (one misbehaving mint, its ecash stashed, does not stop the rest);
+- after a wallet error, a pay-back that could not be stashed, or MAX_PAYBACK_FAILURES pay-backs that failed in
+  an unexpected way (a likely NutCheck bug), no further mint is funded in that sweep. A mint that simply can't pay
+  the invoice ("Payment failed", a 5xx, a timeout) is that mint's problem: its ecash is stashed and the rest go on;
+- a mint still holding stashed ecash from a failed pay-back is not funded again until that ecash comes back,
+  so a mint that can't pay out ties up at most one run's budget;
 - mints may be tested in parallel: wallet calls and the counters are serialised by one lock;
 - every problem becomes a funding alert, which fails the workflow so the owner is emailed.
 """
@@ -110,12 +113,17 @@ class Funder:
             path = self.stash(wallet, label)
             out["stashed"] = True
             why += f"; {wallet.balance} sat stashed encrypted in {path.name}, the next funded run pays it back"
+        elif not stash_on_failure:
+            why += f"; {wallet.balance} sat stay in the stash for the next run"
         else:
             why += f"; {wallet.balance} sat left as ecash on the mint"
+        mint_side = isinstance(last, (MintError, Inconclusive, httpx.TransportError)) and not isinstance(last, NWCError)
         with self._lock:
-            self.payback_failures += 1
+            if not mint_side:
+                self.payback_failures += 1
             too_many = self.payback_failures >= MAX_PAYBACK_FAILURES
-        if isinstance(last, NWCError) or not out.get("stashed") or too_many:
+        unsafe = stash_on_failure and not out.get("stashed")  # the ecash is nowhere but on the mint
+        if isinstance(last, NWCError) or unsafe or too_many:
             self.stop(why + ("" if not too_many else f"; {self.payback_failures} pay-backs failed this run"))
         else:
             with self._lock:
@@ -180,6 +188,20 @@ class Funder:
         states = wallet.client.checkstate([p.Y for p in proofs])
         wallet.proofs = [p for p, st in zip(proofs, states) if st.get("state") == "UNSPENT"]
         return body, wallet
+
+    def pending(self, mint_url: str) -> int:
+        """Sats of this mint's ecash still waiting to be paid back (stashes too big to fold into a run)."""
+        total = 0
+        if not self.stash_dir or not self.stash_dir.exists():
+            return 0
+        for path in self.stash_dir.glob("*.nutstash"):
+            try:
+                body = json.loads(nostr.nip44_decrypt(self._key(), path.read_text().strip()))
+            except Exception:  # noqa: BLE001
+                continue
+            if body["mint"].rstrip("/") == mint_url.rstrip("/") and body.get("amount", 0) >= RECOVER_NOW_SAT:
+                total += body["amount"]
+        return total
 
     def take_stash(self, mint_url: str) -> list[Proof]:
         """Unspent stashed proofs for this mint, removed from the stash (the caller now holds them)."""

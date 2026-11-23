@@ -55,6 +55,7 @@ FAIL_PHRASE = {
     "htlc.locktime": "Lets the HTLC refund key spend before locktime",
     "htlc.refund": "HTLC refunds don't work after locktime",
     "mint.quote_lock": "Mints locked quotes without their signature",
+    "mint.requires_payment": "Issues ecash for invoices nobody paid",
     "ws.subscribe": "WebSocket subscriptions don't work as advertised",
 }
 # The same check can fail the other way: refusing something valid. Those failures are medium severity.
@@ -233,10 +234,14 @@ class MintView:
             return "mint returned errors"
         if not self.cfg.get("funded"):
             return "free checks only for this mint"
+        if any(r["id"] == "mint.funded" and "waiting to be paid back" in r["summary"] for r in L["results"]):
+            return "earlier pay-back still pending"
         # A free-only run says nothing about why the paid checks are missing: ask the latest paid attempt.
         tried = L if _tried_funded(L) else next((r for r in reversed(self.reports) if _tried_funded(r)), None)
         if tried is None:
             return "not yet"
+        if any(r["id"] == "mint.requires_payment" and r["status"] == "fail" for r in tried["results"]):
+            return "fake Lightning backend"
         if any(r["id"] == "mint.quote" and r["status"] == "error" for r in tried["results"]):
             return "mint can't issue ecash"
         if any(r["id"] == "mint.funded" and r["status"] == "skip" for r in tried["results"]):
@@ -287,6 +292,7 @@ class MintView:
         return "\n".join(lines)
 
 
+INDEX_RUNS = 7  # history bars per mint on the scorecard (mint pages show up to 30)
 CARRY_FUNDED_DAYS = 8  # a free-only run keeps funded results up to this old (covers a weekly funded run)
 
 
@@ -679,7 +685,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <div class="mono small muted">{escape(v.url)}</div><div class="small muted" style="margin-top:4px">{escape(v.meta)}</div>
 <div class="small muted runs">{v.lines_html()}</div></td>
 {cells}
-<td>{history_bars(v, 14)}</td>
+<td>{history_bars(v, INDEX_RUNS)}</td>
 <td class="muted" style="white-space:nowrap">{escape(fmt_time(v.latest['started']))}</td></tr>""")
     body = f"""<main>
 <section class="hero"><div style="flex:999 1 520px;min-width:0">
@@ -695,7 +701,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <div class="toolbar"><div role="group" aria-label="Filter by grade" style="display:flex;flex-wrap:wrap;gap:6px">{pill_html}</div>
 <span class="small muted" style="margin-left:auto">— unreachable</span></div>
 <div class="scroll"><table class="mints"><thead>{group_row}<tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
-<th scope="col">Last 14 runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
+<th scope="col">Last {INDEX_RUNS} runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
 <span><b style="color:#A32A12">F</b> funds can be forged or stolen</span><span><b style="color:#8A4F00">C</b> funds withheld or privacy broken</span>
 <span><b style="color:#1F5596">B</b> spec violation, limited impact</span><span><b style="color:#0B5D45">A−</b> warnings only</span></div></section>

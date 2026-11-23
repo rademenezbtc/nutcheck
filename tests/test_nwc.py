@@ -168,3 +168,49 @@ def test_slow_payback_is_awaited_not_retried(tmp_path, monkeypatch):
     f = rep["funding"]
     assert f["ok"] and f["returned"] > 0 and len(w.invoices) == 1, f
     assert alerts == ""
+
+
+def test_fake_lightning_is_caught(tmp_path, monkeypatch):
+    """A mint that marks the funding invoice paid by itself issues ecash for nothing: critical, and no paid checks."""
+    httpx.post(PROXY + "/__naughty", json={"modes": []})  # FakeWallet behind it pays every invoice itself
+    with FakeRelayWallet(7710, proxy_url=PROXY, mint_url=MINT) as w:
+        (rep,), _ = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}])
+    r = {x["id"]: x for x in rep["results"]}["mint.requires_payment"]
+    assert r["status"] == "fail" and r["severity"] == "critical" and rep["grade"] == "F"
+    assert w.paid == [], "never pay into a mint that doesn't wait for payment"
+    assert not any(x.get("funded") and x["status"] == "pass" for x in rep["results"])
+
+
+def test_honest_mint_waits_for_payment(tmp_path, monkeypatch):
+    with FakeRelayWallet(7711, proxy_url=PROXY, mint_url=MINT) as w:
+        (rep,), _ = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}])
+    r = {x["id"]: x for x in rep["results"]}["mint.requires_payment"]
+    assert r["status"] == "pass" and len(w.paid) == 1
+
+
+def test_mint_that_cannot_pay_out_does_not_stop_the_rest(tmp_path, monkeypatch):
+    """'Payment failed' from a mint is that mint's problem: stash its ecash, fund the others, and don't send it
+    more until the stash comes back."""
+    from nutcheck import funding
+    monkeypatch.setattr(funding.Funder, "_sleep", staticmethod(lambda s: None))
+    monkeypatch.setattr(funding, "MAX_PAYBACK_FAILURES", 1)  # would stop at the first failure if it counted
+    httpx.post(PROXY + "/__naughty", json={"modes": ["await_payment", "payout_fail"]})
+    mints = [{"url": u, "funded": "nwc", "wait": 20} for u in (PROXY, "http://localhost:3339")]
+    cfg_extra = {"stash_dir": "stash"}
+    with FakeRelayWallet(7712, proxy_url=PROXY, mint_url=MINT) as w:
+        cfg = {"reports_dir": "reports", "wallet_dir": "wallet", "nwc_max_sat_per_run": 1000, **cfg_extra,
+               "mints": mints}
+        (tmp_path / "sc.json").write_text(json.dumps(cfg))
+        monkeypatch.setenv("NWC_URL", w.uri)
+        assert cmd_sweep([str(tmp_path / "sc.json"), "--nwc"]) == 0
+        assert len(w.paid) == 2, "both mints funded although the first pay-back failed"
+        assert len(list((tmp_path / "stash").glob("*.nutstash"))) == 2
+        # next run: the stashes still can't come back, so those mints are not funded again
+        assert cmd_sweep([str(tmp_path / "sc.json"), "--nwc"]) == 0
+        assert len(w.paid) == 2
+    latest = {}
+    for p in sorted((tmp_path / "reports").rglob("*.json")):
+        latest[p.parent.name] = json.loads(p.read_text())
+    for rep in latest.values():
+        assert rep.get("payback_pending", 0) > 0
+        assert any(x["id"] == "mint.funded" and "waiting to be paid back" in x["summary"] for x in rep["results"])

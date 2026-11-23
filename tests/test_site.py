@@ -210,3 +210,10 @@ def test_paid_line_says_why_paid_checks_did_not_run(tmp_path):
     page = (out / "mints" / "127.0.0.1_3399.html").read_text()
     assert 'aria-label="not run">' in page and "<span>Paid checks · not run: free checks only for this mint</span>" in page
     assert ">A<" in page and "A*" not in page
+
+
+def test_scorecard_shows_the_last_seven_runs(tmp_path):
+    feed, out = _feed(tmp_path, [_free_only] * 10)
+    html = (out / "index.html").read_text()
+    assert "Last 7 runs" in html and "Grades over the last 7 runs" in html
+    assert "Grades over the last 10 runs" in (out / "mints" / "127.0.0.1_3399.html").read_text()

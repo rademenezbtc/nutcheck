@@ -40,7 +40,7 @@ def mint_slug(url: str) -> str:
     return s.lower()
 
 
-def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, preload=None):
+def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, preload=None, expect_payment=False):
     """Run every check against one mint. Returns (report dict, wallet holding leftover proofs)."""
     client = MintClient(url)
     wallet = Wallet(client)
@@ -56,7 +56,7 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, pr
         if preload and wallet.keysets:
             wallet.proofs += preload  # change kept from an earlier run; paid back with this run's leftovers
         if not free_only and wallet.keysets:
-            results += checks_funded.run(client, wallet, info, fund, wait, on_invoice)
+            results += checks_funded.run(client, wallet, info, fund, wait, on_invoice, expect_payment)
     except Inconclusive as e:
         results.append(Result(
             "nutcheck.inconclusive", "Mint answered every request", "-", Severity.INFO, Status.ERROR,
@@ -145,7 +145,10 @@ def cmd_check(argv):
     def on_invoice(invoice, amount):
         print(f"\nPay this invoice ({amount} sat) to run the funded checks:\n\n{invoice}\n", flush=True)
 
-    report, wallet = audit(a.mint, free_only=a.free_only, fund=a.fund, wait=a.wait, on_invoice=on_invoice)
+    host = urlparse(a.mint if "://" in a.mint else "https://" + a.mint).hostname or ""
+    local = host in ("localhost", "127.0.0.1", "::1") or host.endswith(".local")  # a dev mint on FakeWallet
+    report, wallet = audit(a.mint, free_only=a.free_only, fund=a.fund, wait=a.wait, on_invoice=on_invoice,
+                           expect_payment=not local)
     print_report(report, sys.stdout.isatty() and not a.no_color)
     if wallet.proofs and a.leftover != "/dev/null":
         Path(a.leftover).write_text(wallet.export_token() + "\n")
@@ -202,9 +205,13 @@ def cmd_sweep(argv):
         slug = mint_slug(m["url"])
         mode = m.get("funded", False)
         paid = [0]  # what funding this mint cost, fees included (other mints may be paying at the same time)
+        held = 0
         if mode == "nwc":
             use_nwc = funder is not None and not funder.stopped
             free_only = not use_nwc or free_run
+            if use_nwc and not free_only:
+                held = funder.pending(m["url"])  # still owed from a pay-back that failed: don't send more
+                free_only = held > 0
 
             def pay(inv, amt):
                 paid[0] += funder.pay(inv, amt)
@@ -216,7 +223,14 @@ def cmd_sweep(argv):
         wallet = None
         try:
             report, wallet = audit(m["url"], free_only=free_only, fund=m.get("fund", 64), wait=m.get("wait", 60),
-                                   on_invoice=on_invoice, preload=preload)
+                                   on_invoice=on_invoice, preload=preload, expect_payment=(mode == "nwc"))
+            if held:
+                report["results"].append(Result(
+                    "mint.funded", "Funding invoice paid", "04", Severity.INFO, Status.SKIP,
+                    f"Not funded: {held} sat from an earlier run are still waiting to be paid back from this mint "
+                    "(its Lightning payment to NutCheck's wallet failed). Paid checks resume once they come back.",
+                    funded=True).to_dict())
+                report["payback_pending"] = held
             if funder and mode == "nwc" and not free_only:  # never pay a test mint's fake ecash into the real wallet
                 report["funding"] = {"source": "nwc", "paid_in": paid[0], "funded": paid[0] > 0,
                                      "carried_in": sum(p.amount for p in preload), **funder.pay_back(wallet, slug)}

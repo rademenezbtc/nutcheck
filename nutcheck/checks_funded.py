@@ -58,7 +58,10 @@ def _dleq_verdict(ctx: Ctx, proofs: list[Proof], where: str, nut12: bool):
                 f"{len(proofs)} DLEQ proof(s) verified")
 
 
-def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: float, on_invoice) -> list[Result]:
+def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: float, on_invoice,
+        expect_payment: bool = False) -> list[Result]:
+    """expect_payment: the mint should be on real Lightning, so a quote must stay unpaid until NutCheck pays it.
+    False for test mints and local FakeWallet mints, which mark every invoice paid by themselves."""
     ctx = Ctx(client, wallet, info)
     nut12 = claimed(info, "12")
 
@@ -75,6 +78,13 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
     while True:
         st = client.mint_quote_state(q["quote"])
         if st.get("state") in ("PAID", "ISSUED") or st.get("paid") is True:
+            if expect_payment and not announced:
+                ctx.add("mint.requires_payment", "Issues ecash only for paid invoices", "04", S.CRITICAL, St.FAIL,
+                        "The mint marked NutCheck's funding invoice as paid before anyone paid it, so it would issue "
+                        "ecash for nothing. Its Lightning backend is fake or broken: anyone can mint ecash here for "
+                        "free, so the ecash isn't backed by bitcoin. Fine for a test mint, never for one that holds "
+                        "real funds. Paid checks were not run.")
+                return ctx.results
             break
         if not announced:
             try:
@@ -91,6 +101,9 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
                     "Funding invoice not paid in time; funded checks skipped")
             return ctx.results
         time.sleep(2)
+    if expect_payment:
+        ctx.add("mint.requires_payment", "Issues ecash only for paid invoices", "04", S.CRITICAL, St.PASS,
+                "The funding quote stayed unpaid until NutCheck paid the invoice")
     outs = wallet.outputs(crypto.spread_amounts(budget))
     try:
         sigs = client.mint(q["quote"], [o.wire() for o in outs])
@@ -186,6 +199,11 @@ def sig_all_message(inputs: list[Proof], outputs: list[Output], quote_id: str = 
     """NUT-11 SIG_ALL message: secret and C of every input, then amount and B_ of every output (+ quote for melt)."""
     return ("".join(p.secret + p.C for p in inputs)
             + "".join(str(o.amount) + o.blinded.B_hex for o in outputs) + quote_id)
+
+
+def sig_all_message_legacy(inputs: list[Proof], outputs: list[Output]) -> str:
+    """SIG_ALL message before cashubtc/nuts#302 (Nov 2025): every input's secret, then every output's B_."""
+    return "".join(p.secret for p in inputs) + "".join(o.blinded.B_hex for o in outputs)
 
 
 def _lock_view(secret: str) -> str:
@@ -365,6 +383,13 @@ def _locks(ctx: Ctx):
                 ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.HIGH, St.PASS,
                         f"Refused: {'; '.join(c[0] for c in cases)}; accepted: one SIG_ALL signature over all inputs "
                         "and outputs, in the first input")
+            elif (legacy := ctx.spend_outputs(ins)) and attempt_many(
+                    ins, [_witness([A.sign(sig_all_message_legacy(ins, legacy).encode())]), None], legacy)[0]:
+                ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.LOW, St.WARN,
+                        "The SIG_ALL lock is enforced, but the mint only accepts the message format from before "
+                        "November 2025 (secrets and B_ only) and refused the current one, which adds each input's C "
+                        f"and each output's amount ({err}). Wallets following the current NUT-11 can't spend SIG_ALL "
+                        "ecash here.", lock=_lock_view(ins[0].secret))
             else:
                 ctx.add("p2pk.sig_all", "SIG_ALL signature covers the outputs", "11", S.MEDIUM, St.FAIL,
                         "Refused the invalid spends, but also refused a correct SIG_ALL spend (one signature over "

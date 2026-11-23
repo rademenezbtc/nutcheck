@@ -9,11 +9,6 @@
   "embargo_days": 14,
   "mints": [
     {
-      "url": "https://testnut.cashu.space",
-      "funded": true,
-      "wait": 60
-    },
-    {
       "url": "https://mint.minibits.cash/Bitcoin",
       "funded": "nwc"
     },
@@ -95,10 +90,6 @@
     },
     {
       "url": "https://mint.fredix.xyz",
-      "funded": "nwc"
-    },
-    {
-      "url": "https://mint.gitvid.net",
       "funded": "nwc"
     },
     {

@@ -7,7 +7,7 @@
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
 
-**Live scorecard: [nutcheck.org](https://nutcheck.org)**: 41 public mints, all with paid checks; free checks twice a day, paid checks with real sats once a day.
+**Live scorecard: [nutcheck.org](https://nutcheck.org)**: 39 public mints on real Lightning, all with paid checks; free checks twice a day, paid checks with real sats once a day.
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
@@ -23,11 +23,15 @@ NutCheck measures behaviour, not solvency. An A means the mint followed the rule
 
 ## What it found on live mints
 
-First sweeps across ten public mints (CDK and Nutshell, 0.17 to 0.22) turned up one protocol bug, in both implementations:
+Sweeps across 39 public mints (CDK 0.15 to 0.18, Nutshell 0.20 to 0.22) found these, all in the mint software rather than in one operator's setup:
 
 - **Duplicated P2PK tags accepted.** A lock with two `locktime` tags should be rejected as malformed (NUT-11). The mint kept the first copy instead, so a wallet that reads the other copy disagrees on when the refund key can spend. Medium severity, graded B.
-  - **CDK:** every CDK mint tested was affected. Fix merged 16 Nov in [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it.
+  - **CDK:** every CDK mint tested is affected. Fix merged 16 Nov in [cashubtc/cdk#2888](https://github.com/cashubtc/cdk/pull/2888); mints pass once they run a CDK release that includes it.
   - **Nutshell before 0.21.0:** fixed upstream in [cashubtc/nutshell#1008](https://github.com/cashubtc/nutshell/pull/1008); upgrading clears it.
+- **HTLC refunds refused (CDK).** After the timelock, the sender's refund key alone should reclaim an HTLC (NUT-14). Every CDK mint with paid checks refuses it ("Secret is not a HTLC secret"), so an unclaimed HTLC payment can't be refunded. Medium, graded B. Reported by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe) in [cdk#2980](https://github.com/cashubtc/cdk/issues/2980); fixed on CDK main, not yet released.
+- **WebSocket subscriptions never send the current state (CDK).** NUT-17 says a new subscription first gets the current state; CDK mints reply OK and then stay silent for a proof they haven't seen. Low. Also from Mintprobe; fix in review in [cdk#2983](https://github.com/cashubtc/cdk/pull/2983).
+- **Old signing formats.** Some older mints refuse signatures made the current way. CDK 0.15–0.17 and Nutshell 0.20.2 accept only the NUT-20 quote signature from before May 2026, and two Nutshell 0.20.1–0.20.2 mints refused a `SIG_ALL` spend signed with the current (November 2025) message. NutCheck now retries with the old format, so it can tell a version lag (a low warning) from a lock that doesn't work.
+- **A listed mint on fake Lightning.** One mint from the public directories marked NutCheck's invoice as paid before anyone paid it, so it hands out ecash for nothing. NutCheck now grades that F and the scorecard leaves such mints out.
 
 Current grades for each mint are on the [scorecard](https://nutcheck.org), which re-runs the free checks twice a day and the paid ones daily. The scorecard explains known issues in place, with a link to the upstream fix, so an operator sees what to upgrade rather than just a letter.
 
@@ -48,7 +52,7 @@ uvx --from git+https://github.com/rademenezbtc/nutcheck nutcheck https://mint.ex
 Or install it:
 
 ```bash
-pip install git+https://github.com/rademenezbtc/nutcheck   # needs only httpx
+pip install git+https://github.com/rademenezbtc/nutcheck   # needs only httpx and websockets
 nutcheck <mint-url>                  # free checks, then asks you to pay a 64-sat invoice for the rest
 nutcheck <mint-url> --free-only      # nothing paid; the grade covers the free checks only
 nutcheck <mint-url> --fund 128 --json report.json
@@ -74,7 +78,7 @@ A funded run costs about 15–18 sat: input fees and Lightning fees, plus 2 sat 
 
 | Free | Funded |
 |---|---|
-| HTTPS · info well formed, clock skew · keys are valid points · no key reuse · keyset ID re-derivation (v1 and v2) · active keyset · **forged proof refused** · claimed NUT endpoints answer · NUT-17 WebSocket answers and sends the current state first | paid quote issues full amount · quote can't be minted twice · DLEQ on mint/swap/change · outputs > inputs refused · advertised fee is the real fee · double spend and duplicate input refused · checkstate shows SPENT · P2PK: no sig / wrong key / 1-of-2 / refund-before-locktime / duplicate tag all refused, valid spends accepted · SIG_ALL: per-input signatures and outputs swapped after signing refused, one signature over the whole swap accepted · HTLC: wrong/no preimage, missing receiver sig, refund before locktime refused; refund key alone works after locktime · melt pays · overpaid fees returned · NUT-20: a key-locked quote won't mint without its signature (tested on the melt's own internal quote, so it costs nothing extra) |
+| HTTPS · info well formed, clock skew · keys are valid points · no key reuse · keyset ID re-derivation (v1, v2 and legacy base64 aliases) · active keyset · **forged proof refused** · claimed NUT endpoints answer · NUT-17 WebSocket answers and sends the current state first | invoice must really be paid before ecash is issued (catches fake Lightning) · paid quote issues full amount · quote can't be minted twice · DLEQ on mint/swap/change · outputs > inputs refused · advertised fee is the real fee · double spend and duplicate input refused · checkstate shows SPENT · P2PK: no sig / wrong key / 1-of-2 / refund-before-locktime / duplicate tag all refused, valid spends accepted · SIG_ALL: per-input signatures and outputs swapped after signing refused, one signature over the whole swap accepted (the pre-November-2025 message as a fallback, a warning only) · HTLC: wrong/no preimage, missing receiver sig, refund before locktime refused; refund key alone works after locktime · melt pays · overpaid fees returned · NUT-20: a key-locked quote won't mint without its signature (tested on the melt's own internal quote, so it costs nothing extra; the pre-May-2026 format as a fallback, a warning only) |
 
 The fee-return test melts against an invoice from the same mint (an internal payment, so the Lightning fee is 0) and expects every overpaid sat back.
 
@@ -88,7 +92,7 @@ Open an [issue](https://github.com/rademenezbtc/nutcheck/issues/new) with your m
 {"url": "https://mint.example.com", "funded": "nwc"}
 ```
 
-`"funded": "nwc"` lets the daily funded run spend about 15 sat of NutCheck's own money on your mint and pay the rest back; `false` runs the free checks only. Then add your badge:
+`"funded": "nwc"` lets the daily funded run spend about 15 sat of NutCheck's own money on your mint and pay the rest back. nutcheck.org lists only mints that can run the paid checks on real Lightning; in your own scorecard, `false` runs the free checks only. Then add your badge:
 
 ```markdown
 [![NutCheck](https://nutcheck.org/badge/mint.example.com.svg)](https://nutcheck.org/mints/mint.example.com.html)
@@ -114,7 +118,7 @@ After each run NutCheck publishes one signed review per mint as a [NIP-87](https
           ["t", "nutcheck"], ["tested", "2026-11-15T02:24:25+00:00"], ["alt", "NutCheck review of ..."]]}
 ```
 
-- **Rating:** A = 5, B = 4, C = 3, D = 2, F = 1. A partial run (*) gets at most 4, since half the mint went untested.
+- **Rating:** A = 5, B = 4, C = 3, D = 2, F = 1. A mint whose paid checks haven't run gets at most 4, since half of it went untested, and the review says why they didn't run.
 - **Format:** the content starts with `[n/5]`, as cashu.me writes reviews, and the `rating` tag carries the same number. The extra tags (`grade`, `r`, `tested`) are for clients that want more than stars.
 - **What gets published:** a mint that didn't answer, or whose run broke off, keeps its previous review. During a disclosure embargo the review gives the grade and says details are withheld, exactly like the site.
 - **Relays:** `nostr_relays` in `scorecard.json`. A review is re-sent only when its text changes or the relay's copy is a day old.
@@ -136,8 +140,8 @@ Funded checks are paid from a small Lightning wallet. Zaps to ⚡ `nutcheck@rizf
   nutcheck http://127.0.0.1:3339          # → F, every P2PK/HTLC check fails
   ```
 
-  Modes: `bad_dleq no_dleq keyset_tamper fee_lie short_mint quote_replay overspend double_spend forgery lock_bypass keep_change info_lie sigall_ignore htlc_no_refund quote_lock_ignore ws_dead ws_silent`. For the "accepts what it shouldn't" modes, the proxy mints the client's outputs from a fake-paid quote, so the client gets real signatures.
-- **Funding over Nostr Wallet Connect.** For each funded mint the sweep pays a 64-sat invoice from an NWC wallet, runs the funded checks, then melts every leftover sat back to the same wallet. It pays out at most `nwc_max_sat_per_run` (default 1000) per run. If a pay-back fails, the ecash is kept encrypted (NIP-44, keyed from the wallet secret) on the `data` branch and recovered on the next run.
+  Fault modes: `bad_dleq no_dleq keyset_tamper fee_lie short_mint quote_replay overspend double_spend forgery lock_bypass keep_change info_lie sigall_ignore sigall_legacy htlc_no_refund quote_lock_ignore ws_dead ws_silent`. Helper modes for the funding tests: `await_payment payout_fail slow_melt rate_limit_burst rate_limit_hard`. Without `await_payment` the FakeWallet mint behind the proxy pays every invoice itself, which is exactly what the fake-Lightning check looks for. For the "accepts what it shouldn't" modes, the proxy mints the client's outputs from a fake-paid quote, so the client gets real signatures.
+- **Funding over Nostr Wallet Connect.** For each funded mint the sweep pays a 64-sat invoice from an NWC wallet, runs the funded checks, then melts every leftover sat back to the same wallet. It pays out at most `nwc_max_sat_per_run` per run (default 1000; 4000 on nutcheck.org). A pay-back melt gets 90 s, and if it times out NutCheck asks the mint how the payment ended rather than retrying. If a pay-back fails, the ecash is kept encrypted (NIP-44, keyed from the wallet secret) on the `data` branch and retried on the next run; that mint isn't funded again until it comes back.
 - **Responsible disclosure is built in.** A critical or high failure shows as a grade only, with details withheld from the pages, the JSON report, the feed and the badge ("under review"), until `embargo_days` (14) after it was first seen. Set `"disclosed": true` to publish early, for example once the operator has fixed it.
 - **Published evidence can't be spent.** Failed checks include the request and response that exposed them, with proofs, outputs, witnesses and preimages reduced to counts or redacted.
 
@@ -148,6 +152,7 @@ Test a list of mints on a schedule and publish the results as a static site: a s
 ```bash
 nutcheck sweep scorecard.json            # test every mint, save reports/<mint>/<timestamp>.json
 nutcheck sweep scorecard.json --nwc      # also run funded checks on "funded": "nwc" mints (needs NWC_URL)
+nutcheck sweep scorecard.json --free-only --jobs 6   # free checks only, six mints at a time
 nutcheck site scorecard.json -o site/    # build the site from all saved reports
 ```
 
@@ -161,8 +166,10 @@ nutcheck site scorecard.json -o site/    # build the site from all saved reports
 **When the run fails with "NutCheck needs your attention",** either NutCheck found a critical or high failure, or funding went wrong. GitHub emails you about the failed run, and the run summary says which. For a mint failure, contact the operator privately, add `"notified": "<date>"` to that mint in `scorecard.json`, and push. The alert stops, and the site then says the operator was told.
 
 Notes:
+- The scorecard shows each mint's last 7 runs; its own page shows up to 30.
 - If a run can't fund a mint (or a manual run skips the paid checks), its page combines the latest free checks with its most recent funded results (up to 8 days old, and only while the mint runs the same software version), so a grade doesn't flip with every free-only run.
-- `testnut.cashu.space` runs on fake Lightning, so it gets the full funded run in every paid sweep, for free.
+- The scorecard only lists mints on real Lightning. A mint that marks NutCheck's invoice as paid before anyone pays it is graded F ("issues ecash for invoices nobody paid") and gets no paid checks. Test mints such as `testnut.cashu.space` are fine for trying the CLI (`--fund` still asks you to pay, but the mint pays itself), they just aren't on the scorecard.
+- A mint that can't pay NutCheck's wallet back ("Payment failed") keeps that ecash stashed and isn't funded again until it comes back; the other mints carry on. Only wallet errors, leftovers that couldn't be stashed, or repeated unexpected pay-back errors stop funding for the rest of a run.
 - An unresolved serious failure fails every run, so GitHub emails you up to 4 times a day until you set `"notified"`.
 - GitHub turns off scheduled workflows in public repos after 60 days without activity. The daily commit to `data` should count. If the workflow ever shows as disabled, re-enable it in the Actions tab.
 - GitHub runners use well-known cloud IP ranges, so a mint could recognise NutCheck and behave differently. That's an open problem.
@@ -175,7 +182,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 77 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 82 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -187,7 +194,8 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **15 Nov:** free checks every 6 hours, funded daily; signed NIP-87 reviews on Nostr, already shown in a Cashu wallet; mint pages show the exact lock a mint accepted; sweeps that survive a crash without losing ecash; grade-history tooltips; the [1-minute demo](https://nutcheck.org/demo/).
 - **16 Nov:** CDK merged the fix for the duplicate-tag issue ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888) by robwoodgate), three days after NutCheck posted evidence that every CDK mint it tests is affected.
 - **23 Nov:** four new checks: HTLC refunds after the locktime, `SIG_ALL` (the signature must cover the outputs), NUT-17 WebSocket subscriptions and NUT-20 locked mint quotes, each with a naughty-proxy fault in the CI matrix. The HTLC-refund and WebSocket checks follow issues found by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe), another Nut November mint tester ([cdk#2980](https://github.com/cashubtc/cdk/issues/2980), [cdk#2983](https://github.com/cashubtc/cdk/pull/2983)).
-- **23 Nov (later):** one grade per mint with a line each for the free and the paid checks (when, and how they went) instead of the asterisk; 39 more mints from MintRadar and cashumints.space (41 in all, keeping only mints that answer and can issue ecash, so every one gets the paid checks); free checks twice a day, paid daily; sweeps test six mints at a time.
+- **23 Nov (later):** one grade per mint with a ✓/✗ line each for the free and the paid checks (when, and how they went) instead of the asterisk; mints from MintRadar and cashumints.space, trimmed to the 39 that answer and issue ecash on real Lightning, so every one gets the paid checks; free checks twice a day, paid daily; sweeps test six mints at a time; the scorecard shows the last 7 runs.
+- **23 Nov (evening):** fixes from the first big runs: a fake-Lightning check (ecash only for invoices that were really paid); a mint that can't pay NutCheck back no longer stops funding for the others; slow pay-backs are awaited, not counted as failures; legacy base64 keyset IDs are recognised (one mint was wrongly graded C for them); old `SIG_ALL` and NUT-20 signing formats are retried and shown as warnings.
 - **Next:** a GitHub Action for operators.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.

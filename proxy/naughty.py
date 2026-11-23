@@ -44,6 +44,8 @@ MODES = {
     "htlc_no_refund": "refuse the HTLC refund path (refund signature without a preimage), like CDK 0.18.x",
     "sigall_ignore": "accept SIG_ALL spends whose signature does not cover the outputs",
     "quote_lock_ignore": "ignore NUT-20: drop the quote pubkey, then mint the quote without a signature",
+    "sigall_legacy": "accept SIG_ALL spends only when signed over the pre-Nov-2025 message (secrets and B_ only)",
+    "payout_fail": "refuse every melt with 'Payment failed', like a mint whose Lightning node can't route out",
     "slow_melt": "answer melts only after a 4 s delay (the payment itself completes at once), like a slow Lightning payout",
     "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
     "rate_limit_burst": "answer 429 to every 8th request, twice in a row (a mint with a strict nginx limit)",
@@ -95,6 +97,20 @@ async def substitute_key() -> str:
         from nutcheck.secp import PrivateKey
         SUBSTITUTE_KEY = PrivateKey().pubkey_hex
     return SUBSTITUTE_KEY
+
+
+async def legacy_sig_all(req: dict):
+    """Judge a SIG_ALL swap the way older mints did: one signature over every secret, then every B_."""
+    import hashlib, sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+    from nutcheck import secp
+    ins, outs = req["inputs"], req["outputs"]
+    msg = ("".join(i["secret"] for i in ins) + "".join(o["B_"] for o in outs)).encode()
+    pub = bytes.fromhex(json.loads(ins[0]["secret"])[1]["data"])[1:]
+    sigs = json.loads(ins[0].get("witness") or "{}").get("signatures", [])
+    if any(secp.schnorr_verify(hashlib.sha256(msg).digest(), pub, bytes.fromhex(s)) for s in sigs):
+        return {"signatures": await forge_signatures(outs)}, 200
+    return {"detail": "signature threshold not met. 0 < 1.", "code": 11000}, 400
 
 
 async def relay_ws(client: WebSocket):
@@ -166,6 +182,13 @@ async def handle(request: Request):
         for i in req_json.get("inputs", []):
             if i["secret"].startswith('["HTLC"') and "preimage" not in json.loads(i.get("witness") or "{}"):
                 return JSONResponse({"detail": "Secret is not a HTLC secret", "code": 10000}, 400)
+
+    if path == "/v1/melt/bolt11" and on("payout_fail"):
+        return JSONResponse({"detail": "Payment failed", "code": 20004}, 400)
+
+    if path == "/v1/swap" and req_json and on("sigall_legacy") and any(
+            '"SIG_ALL"' in i["secret"] for i in req_json.get("inputs", [])):
+        return JSONResponse(*await legacy_sig_all(req_json))
 
     if path == "/v1/mint/quote/bolt11" and request.method == "POST" and on("quote_lock_ignore") and req_json:
         req_json.pop("pubkey", None)
