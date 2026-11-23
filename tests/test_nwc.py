@@ -156,3 +156,15 @@ def test_free_only_sweep_spends_nothing(tmp_path, monkeypatch):
                            extra=("--free-only",))
     assert w.paid == [] and w.invoices == []
     assert rep["partial"] and "funding" not in rep
+
+
+def test_slow_payback_is_awaited_not_retried(tmp_path, monkeypatch):
+    """A pay-back melt that answers late must not count as failed: NutCheck asks the mint how it ended."""
+    from nutcheck import funding
+    monkeypatch.setattr(funding, "PAYBACK_MELT_TIMEOUT", 1)
+    httpx.post(PROXY + "/__naughty", json={"modes": ["await_payment", "slow_melt"]})
+    with FakeRelayWallet(7709, proxy_url=PROXY, mint_url=MINT) as w:
+        (rep,), alerts = _sweep(tmp_path, monkeypatch, w, [{"url": PROXY, "funded": "nwc", "wait": 20}])
+    f = rep["funding"]
+    assert f["ok"] and f["returned"] > 0 and len(w.invoices) == 1, f
+    assert alerts == ""

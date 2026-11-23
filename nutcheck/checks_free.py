@@ -81,9 +81,17 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
         out.append(Result("keys.load", "Keys and keysets load", "01", S.CRITICAL, St.FAIL, str(e)))
         return out, info
 
+    # Legacy base64 IDs that derive from the same keys as a current keyset are aliases kept for old tokens,
+    # not a second keyset: leave them out of the key-reuse check (their ID is still checked below).
+    current = {tuple(sorted(k.keys.items())) for k in wallet.keysets.values() if _versioned(k.id)}
+    aliases = {k.id for k in wallet.keysets.values()
+               if not _versioned(k.id) and tuple(sorted(k.keys.items())) in current
+               and crypto.keyset_id_legacy(k.keys) == k.id}
     bad_points, non_pow2, reused = [], [], []
     seen: dict[str, str] = {}
     for ks in wallet.keysets.values():
+        if ks.id in aliases:
+            continue
         for amt, pk in ks.keys.items():
             try:
                 secp.decode(pk)
@@ -112,6 +120,9 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
     # keyset ID derivation (NUT-02)
     mismatches, checked = [], 0
     for ks in wallet.keysets.values():
+        if ks.id in aliases:
+            checked += 1  # derived above: base64 of the same keys
+            continue
         if ks.id.startswith("00") and len(ks.id) == 16:
             expect = crypto.keyset_id_v1(ks.keys)
         elif ks.id.startswith("01") and len(ks.id) == 66:
@@ -127,7 +138,8 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
         St.FAIL if mismatches else St.PASS,
         (f"{len(mismatches)} keyset(s) do not derive to their advertised ID. Wallets cannot verify which keys "
          "signed their ecash, and v2 IDs also commit to the advertised fee.") if mismatches
-        else f"{checked} keyset ID(s) re-derived and matched",
+        else f"{checked} keyset ID(s) re-derived and matched"
+             + (f", including {len(aliases)} legacy base64 alias(es) of current keysets" if aliases else ""),
         evidence={"mismatches": mismatches},
     ))
 
@@ -139,8 +151,9 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
     ))
 
     # -- forged proof must be rejected (free) -----------------------------------
-    if actives:
-        ks = actives[0]
+    own_unit = [k for k in actives if k.unit == wallet.unit]
+    if own_unit:
+        ks = wallet.active
         amt = min(ks.keys)
         forged = {"amount": amt, "id": ks.id, "secret": crypto.random_secret(),
                   "C": secp.encode_hex(secp.mul(7, secp.G))}
@@ -187,6 +200,11 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
     if claimed(info, "17"):
         out.append(websocket_check(client, info))
     return out, info
+
+
+def _versioned(keyset_id: str) -> bool:
+    """A current (v1 '00…' or v2 '01…') hex keyset ID, as opposed to a legacy base64 one."""
+    return keyset_id[:2] in ("00", "01") and all(c in "0123456789abcdef" for c in keyset_id.lower())
 
 
 def ws_commands(info: dict) -> set[str]:

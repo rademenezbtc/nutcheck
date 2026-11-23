@@ -1,6 +1,7 @@
 """Cashu crypto, written from the NUT specs: NUT-00 BDHKE, NUT-02 keyset IDs, NUT-12 DLEQ."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import secrets
 from dataclasses import dataclass
@@ -63,6 +64,13 @@ def verify_dleq_proof(A: secp.Point, secret: str, C: secp.Point, e: int, s: int,
     B_ = secp.add(Y, secp.mul(r, G))
     C_ = secp.add(C, secp.mul(r, A))
     return verify_dleq_blind(A, B_, C_, e, s)
+
+
+def keyset_id_legacy(keys: dict[int, str]) -> str:
+    """Pre-2024 base64 keyset IDs (Nutshell before 0.15). Still served by some mints as aliases of their
+    current keysets, so old tokens stay redeemable: base64(sha256(hex keys concatenated by amount))[:12]."""
+    blob = "".join(keys[a] for a in sorted(keys)).encode()
+    return base64.b64encode(hashlib.sha256(blob).digest()).decode()[:12]
 
 
 def keyset_id_v1(keys: dict[int, str]) -> str:

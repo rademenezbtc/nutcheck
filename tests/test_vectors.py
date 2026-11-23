@@ -155,3 +155,39 @@ def test_nut20_message():
     # and our signer produces signatures that verify against the same digest
     k = secp.PrivateKey(1)
     assert secp.schnorr_verify(digest, bytes.fromhex(k.pubkey_hex)[1:], bytes.fromhex(k.sign(msg)))
+
+
+def test_legacy_keyset_id():
+    # Independent value: computed with the browser's WebCrypto SHA-256 and btoa, not with Python
+    keys = {1: "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            2: "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            4: "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"}
+    assert crypto.keyset_id_legacy(keys) == "CSp9IXskZ64l"
+
+
+def test_legacy_alias_is_not_key_reuse():
+    """mint.mjex.me (Nutshell 0.20.0) lists each keyset twice: its 00… ID and its pre-2024 base64 ID."""
+    from nutcheck import checks_free
+    from nutcheck.wallet import Keyset, Wallet
+
+    keys = {1: secp.encode_hex(secp.mul(11, secp.G)), 2: secp.encode_hex(secp.mul(12, secp.G))}
+    v1 = crypto.keyset_id_v1(keys)
+    legacy = crypto.keyset_id_legacy(keys)
+
+    class Client:
+        url = "https://mint.example"
+        log = []
+        def info(self): return {"nuts": {}, "name": "x", "version": "Nutshell/0.20.0"}
+        def swap(self, *a): raise checks_free.MintError(400, {"code": 10001, "detail": "invalid proof"})
+
+    w = Wallet(Client())
+    w.load_keysets = lambda: None
+    w.keysets = {k: Keyset(k, "sat", True, 0, dict(keys)) for k in (v1, legacy)}
+    res = {r.id: r for r in checks_free.run(w.client, w)[0]}
+    assert res["keys.unique"].status.value == "pass", res["keys.unique"].summary
+    assert res["keys.keyset_id"].status.value == "pass", res["keys.keyset_id"].summary
+    assert "legacy base64" in res["keys.keyset_id"].summary
+    # a base64 ID that does NOT derive from its keys is still a mismatch
+    w.keysets = {k: Keyset(k, "sat", True, 0, dict(keys)) for k in (v1, "AAAAAAAAAAAA")}
+    res = {r.id: r for r in checks_free.run(w.client, w)[0]}
+    assert res["keys.keyset_id"].status.value == "fail"

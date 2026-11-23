@@ -20,6 +20,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
+
 from . import nostr
 from .client import Inconclusive, MintClient, MintError
 from .nwc import NWC, NWCError
@@ -27,8 +29,10 @@ from .wallet import Proof, Wallet
 
 MIN_PAYBACK_SAT = 3
 RECOVER_NOW_SAT = 20  # smaller stashes are folded into that mint's next funded run instead
+PAYBACK_MELT_TIMEOUT = 90  # a melt answers only once its Lightning payment settles, which can take a while
+PAYBACK_SETTLE_WAIT = 120  # after a timeout or PENDING, keep asking the mint how the payment ended
 MAX_PAYBACK_FAILURES = 3  # more than this many mints failing to pay back in one run looks like our bug: stop
-_RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError)
+_RETRYABLE = (NWCError, MintError, Inconclusive, OSError, TimeoutError, ConnectionError, httpx.TransportError)
 
 
 class FundingStopped(Exception):
@@ -135,9 +139,15 @@ class Funder:
                 target -= need - bal
                 continue
             blanks = wallet.outputs([1] * max((bal - q["amount"] - in_fee).bit_length(), 1))
-            res = c.melt(q["quote"], [p.wire() for p in proofs], [o.wire() for o in blanks])
+            try:
+                res = c.melt(q["quote"], [p.wire() for p in proofs], [o.wire() for o in blanks],
+                             timeout=PAYBACK_MELT_TIMEOUT)
+            except httpx.TimeoutException:
+                # No answer yet is not a failure: the mint may still be paying. Retrying now would try to spend
+                # the same proofs twice, so ask the mint how this payment ended instead.
+                res = {"state": "PENDING"}
             state = res.get("state") or ("PAID" if res.get("paid") else "UNPAID")
-            deadline = time.monotonic() + 60
+            deadline = time.monotonic() + PAYBACK_SETTLE_WAIT
             while state == "PENDING" and time.monotonic() < deadline:
                 time.sleep(3)
                 res = c.get(f"/v1/melt/quote/bolt11/{q['quote']}")

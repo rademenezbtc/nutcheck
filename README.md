@@ -7,7 +7,7 @@
 [![Tests](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/tests.yml)
 [![Scorecard](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml/badge.svg)](https://github.com/rademenezbtc/nutcheck/actions/workflows/scorecard.yml)
 
-**Live scorecard: [nutcheck.org](https://nutcheck.org)**: 46 public mints, free checks twice a day, paid checks with real sats once a day.
+**Live scorecard: [nutcheck.org](https://nutcheck.org)**: 41 public mints, all with paid checks; free checks twice a day, paid checks with real sats once a day.
 
 **▶ [Watch the 1-minute demo](https://nutcheck.org/demo/)**: the scorecard, a passing and a failing mint, and proof that NutCheck spots a mint that breaks the protocol.
 
@@ -175,7 +175,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 74 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 77 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -187,7 +187,7 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **15 Nov:** free checks every 6 hours, funded daily; signed NIP-87 reviews on Nostr, already shown in a Cashu wallet; mint pages show the exact lock a mint accepted; sweeps that survive a crash without losing ecash; grade-history tooltips; the [1-minute demo](https://nutcheck.org/demo/).
 - **16 Nov:** CDK merged the fix for the duplicate-tag issue ([cdk#2888](https://github.com/cashubtc/cdk/pull/2888) by robwoodgate), three days after NutCheck posted evidence that every CDK mint it tests is affected.
 - **23 Nov:** four new checks: HTLC refunds after the locktime, `SIG_ALL` (the signature must cover the outputs), NUT-17 WebSocket subscriptions and NUT-20 locked mint quotes, each with a naughty-proxy fault in the CI matrix. The HTLC-refund and WebSocket checks follow issues found by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe), another Nut November mint tester ([cdk#2980](https://github.com/cashubtc/cdk/issues/2980), [cdk#2983](https://github.com/cashubtc/cdk/pull/2983)).
-- **23 Nov (later):** one grade per mint with a line each for the free and the paid checks (when, and how they went) instead of the asterisk; 39 more mints from MintRadar and cashumints.space (46 in all, 43 with paid checks, after dropping three that never answered); free checks twice a day, paid daily; sweeps test six mints at a time.
+- **23 Nov (later):** one grade per mint with a line each for the free and the paid checks (when, and how they went) instead of the asterisk; 39 more mints from MintRadar and cashumints.space (41 in all, keeping only mints that answer and can issue ecash, so every one gets the paid checks); free checks twice a day, paid daily; sweeps test six mints at a time.
 - **Next:** a GitHub Action for operators.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.

@@ -81,9 +81,9 @@ class Wallet:
 
     @property
     def active(self) -> Keyset:
-        for ks in self.keysets.values():
-            if ks.active and ks.unit == self.unit:
-                return ks
+        mine = [ks for ks in self.keysets.values() if ks.active and ks.unit == self.unit]
+        for ks in sorted(mine, key=lambda k: k.id[:2] not in ("00", "01")):  # current IDs before legacy aliases
+            return ks
         raise RuntimeError(f"mint has no active {self.unit} keyset")
 
     def fee(self, proofs: list[Proof]) -> int:

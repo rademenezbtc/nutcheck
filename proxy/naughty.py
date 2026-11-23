@@ -44,6 +44,7 @@ MODES = {
     "htlc_no_refund": "refuse the HTLC refund path (refund signature without a preimage), like CDK 0.18.x",
     "sigall_ignore": "accept SIG_ALL spends whose signature does not cover the outputs",
     "quote_lock_ignore": "ignore NUT-20: drop the quote pubkey, then mint the quote without a signature",
+    "slow_melt": "answer melts only after a 4 s delay (the payment itself completes at once), like a slow Lightning payout",
     "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
     "rate_limit_burst": "answer 429 to every 8th request, twice in a row (a mint with a strict nginx limit)",
     "rate_limit_hard": "answer 429 to everything after the first 25 requests (a mint that throttles hard)",
@@ -218,6 +219,9 @@ async def handle(request: Request):
         )
         if override:
             data, status = {"signatures": await forge_signatures(req_json["outputs"])}, 200
+
+    if path == "/v1/melt/bolt11" and on("slow_melt"):
+        await asyncio.sleep(4)
 
     if path.startswith("/v1/melt/") and status == 200 and on("keep_change") and data.get("change"):
         data["change"] = []

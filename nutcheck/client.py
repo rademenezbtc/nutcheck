@@ -67,21 +67,22 @@ class MintClient:
 
     _sleep = staticmethod(time.sleep)  # tests replace this to skip real waiting
 
-    def _send(self, method, path, body):
+    def _send(self, method, path, body, timeout=None):
         interval = self.slow_interval if (self.slow and method == "POST") else self.min_interval
         wait = interval - (time.monotonic() - self._last)
         if wait > 0:
             self._sleep(wait)
         self._last = time.monotonic()
-        return self._http.request(method, self.url + path, json=body)
+        return self._http.request(method, self.url + path, json=body,
+                                  timeout=timeout if timeout is not None else httpx.USE_CLIENT_DEFAULT)
 
-    def _call(self, method: str, path: str, body=None):
+    def _call(self, method: str, path: str, body=None, timeout: float | None = None):
         retryable = {429} | ({502, 503, 504} if method == "GET" else set())
         attempt = 0
         while True:
             t0 = time.monotonic()
             try:
-                r = self._send(method, path, body)
+                r = self._send(method, path, body, timeout)
             except httpx.TimeoutException:
                 if method == "GET" and attempt < 1:
                     attempt += 1
@@ -115,8 +116,8 @@ class MintClient:
     def get(self, path):
         return self._call("GET", path)
 
-    def post(self, path, body):
-        return self._call("POST", path, body)
+    def post(self, path, body, timeout: float | None = None):
+        return self._call("POST", path, body, timeout)
 
     # convenience wrappers
     def info(self):
@@ -149,11 +150,11 @@ class MintClient:
     def melt_quote(self, request: str, unit: str = "sat"):
         return self.post("/v1/melt/quote/bolt11", {"request": request, "unit": unit})
 
-    def melt(self, quote: str, inputs: list[dict], outputs: list[dict] | None = None):
+    def melt(self, quote: str, inputs: list[dict], outputs: list[dict] | None = None, timeout: float | None = None):
         body = {"quote": quote, "inputs": inputs}
         if outputs is not None:
             body["outputs"] = outputs
-        return self.post("/v1/melt/bolt11", body)
+        return self.post("/v1/melt/bolt11", body, timeout)
 
     def checkstate(self, Ys: list[str]):
         return self.post("/v1/checkstate", {"Ys": Ys})["states"]
