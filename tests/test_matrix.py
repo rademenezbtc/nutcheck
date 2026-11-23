@@ -30,7 +30,8 @@ EXPECT = {  # mode -> (checks that must fail, worst acceptable grade)
     "quote_lock_ignore": ({"mint.quote_lock"}, "C"),
     "ws_dead": ({"ws.subscribe"}, "A-"),
     "ws_silent": ({"ws.subscribe"}, "A-"),
-    "sigall_legacy": (set(), "A-"),  # a warning: the lock holds, but only with the old message
+    "sigall_legacy": (set(), "A-"),
+    "min_mint_100": (set(), "A"),  # not a fault: NutCheck must fund enough to run every check  # a warning: the lock holds, but only with the old message
     "keep_change": ({"melt.fee_return"}, "C"),
     "info_lie": ({"info.claims_answer"}, "B"),
 }

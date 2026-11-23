@@ -33,6 +33,10 @@ class MintUnavailable(Inconclusive):
     pass
 
 
+class MintTimeout(MintUnavailable):
+    """No answer in time. For a POST the mint may still have acted on it."""
+
+
 class MintError(Exception):
     def __init__(self, status: int, body):
         self.status = status
@@ -87,7 +91,12 @@ class MintClient:
                 if method == "GET" and attempt < 1:
                     attempt += 1
                     continue
-                raise
+                raise MintTimeout(f"{method} {path}: no answer in time") from None
+            except httpx.TransportError as e:  # connection refused or dropped: the mint, not a protocol answer
+                if method == "GET" and attempt < 1:
+                    attempt += 1
+                    continue
+                raise MintUnavailable(f"{method} {path}: connection failed ({type(e).__name__})") from None
             ms = int((time.monotonic() - t0) * 1000)
             waits = self.backoff if r.status_code == 429 else self.gateway_backoff
             if r.status_code in retryable and attempt < len(waits):

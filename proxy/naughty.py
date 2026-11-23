@@ -46,6 +46,7 @@ MODES = {
     "quote_lock_ignore": "ignore NUT-20: drop the quote pubkey, then mint the quote without a signature",
     "sigall_legacy": "accept SIG_ALL spends only when signed over the pre-Nov-2025 message (secrets and B_ only)",
     "payout_fail": "refuse every melt with 'Payment failed', like a mint whose Lightning node can't route out",
+    "min_mint_100": "advertise and enforce a 100-sat minimum mint amount, like mint.sovran.money",
     "slow_melt": "answer melts only after a 4 s delay (the payment itself completes at once), like a slow Lightning payout",
     "await_payment": "report mint quotes unpaid until POST /__paid marks the invoice paid (for wallet tests)",
     "rate_limit_burst": "answer 429 to every 8th request, twice in a row (a mint with a strict nginx limit)",
@@ -183,6 +184,11 @@ async def handle(request: Request):
             if i["secret"].startswith('["HTLC"') and "preimage" not in json.loads(i.get("witness") or "{}"):
                 return JSONResponse({"detail": "Secret is not a HTLC secret", "code": 10000}, 400)
 
+    if path == "/v1/mint/quote/bolt11" and request.method == "POST" and on("min_mint_100") and req_json \
+            and req_json.get("amount", 0) < 100:
+        return JSONResponse({"detail": f"Amount must be between `100` and `100000` is `{req_json['amount']}`",
+                             "code": 11006}, 400)
+
     if path == "/v1/melt/bolt11" and on("payout_fail"):
         return JSONResponse({"detail": "Payment failed", "code": 20004}, 400)
 
@@ -213,6 +219,9 @@ async def handle(request: Request):
     if on("await_payment") and path.startswith("/v1/mint/quote/bolt11") and status == 200 \
             and data.get("request") not in state["paid"]:
         data["state"], data["paid"] = "UNPAID", False
+    if path == "/v1/info" and on("min_mint_100"):
+        for m in data["nuts"]["4"]["methods"]:
+            m["min_amount"], m["max_amount"] = 100, 100000
     if path == "/v1/info" and on("info_lie"):
         data["nuts"]["7"] = {"supported": True}
     if path.startswith("/v1/mint/quote/bolt11") and on("quote_lock_ignore") and status == 200:

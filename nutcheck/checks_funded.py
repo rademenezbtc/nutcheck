@@ -64,6 +64,9 @@ def run(client: MintClient, wallet: Wallet, info: dict, budget: int, wait_s: flo
     False for test mints and local FakeWallet mints, which mark every invoice paid by themselves."""
     ctx = Ctx(client, wallet, info)
     nut12 = claimed(info, "12")
+    floor = mint_min(info, wallet.unit)
+    if floor > 8:  # e.g. "Amount must be between 100 and 100000": fund enough for the internal melt too
+        budget = max(budget, floor + 64)
 
     # ---------------------------------------------------------------- mint (NUT-04)
     try:
@@ -435,7 +438,7 @@ def _melt(ctx: Ctx):
     w, c = ctx.wallet, ctx.client
     if not claimed(ctx.info, "5"):
         return
-    amount = 8
+    amount = max(8, mint_min(ctx.info, w.unit))  # the smallest invoice this mint will issue
     # NUT-20: lock this internal quote to a key, so claiming it back below doubles as the quote-lock test
     qkey = PrivateKey() if claimed(ctx.info, "20") else None
     try:
@@ -493,6 +496,14 @@ def _melt(ctx: Ctx):
         w.proofs += w.unblind(c.mint(mq["quote"], [o.wire() for o in outs]), outs)
     except MintError:
         pass
+
+
+def mint_min(info: dict, unit: str) -> int:
+    """The smallest bolt11 mint quote this mint accepts in `unit` (NUT-04 min_amount), 0 if it sets none."""
+    for m in info.get("nuts", {}).get("4", {}).get("methods", []):
+        if m.get("method") == "bolt11" and m.get("unit") == unit:
+            return int(m.get("min_amount") or 0)
+    return 0
 
 
 def nut20_message(quote: str, outputs: list[Output]) -> bytes:

@@ -26,7 +26,7 @@ from pathlib import Path
 import httpx
 
 from . import nostr
-from .client import Inconclusive, MintClient, MintError
+from .client import Inconclusive, MintClient, MintError, MintTimeout
 from .nwc import NWC, NWCError
 from .wallet import Proof, Wallet
 
@@ -164,7 +164,7 @@ class Funder:
             try:
                 res = c.melt(q["quote"], [p.wire() for p in proofs], [o.wire() for o in blanks],
                              timeout=PAYBACK_MELT_TIMEOUT)
-            except httpx.TimeoutException:
+            except (httpx.TimeoutException, MintTimeout):
                 # No answer yet is not a failure: the mint may still be paying. Retrying now would try to spend
                 # the same proofs twice, so ask the mint how this payment ended instead.
                 res = {"state": "PENDING"}
