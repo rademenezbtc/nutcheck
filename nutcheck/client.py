@@ -132,6 +132,10 @@ class MintClient:
     def info(self):
         return self.get("/v1/info")
 
+    def info_fresh(self):
+        """/v1/info past any cache: a cached copy carries an old `time`, which would look like clock skew."""
+        return self.get(f"/v1/info?nocache={int(time.time() * 1000)}")
+
     def keysets(self):
         return self.get("/v1/keysets")["keysets"]
 

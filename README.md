@@ -186,7 +186,7 @@ uv venv -p 3.12 .mintenv
 VIRTUAL_ENV=.mintenv uv pip install cashu==0.21.0 --override overrides.txt   # Nutshell 0.21.0 with pin fixes
 run/start_mint.sh mint1     # FakeWallet on :3338, 100 ppk input fee
 pip install -e ".[dev,nwc,proxy]" && python proxy/naughty.py --upstream http://127.0.0.1:3338 --port 3339 &
-pytest                      # 91 tests; the end-to-end ones skip if the mint or proxy isn't running
+pytest                      # 93 tests; the end-to-end ones skip if the mint or proxy isn't running
 ```
 
 ## Built for Nut November 2026
@@ -200,7 +200,7 @@ NutCheck was started for [Nut November](https://nutnovember.org/). Everything in
 - **23 Nov:** four new checks: HTLC refunds after the locktime, `SIG_ALL` (the signature must cover the outputs), NUT-17 WebSocket subscriptions and NUT-20 locked mint quotes, each with a naughty-proxy fault in the CI matrix. The HTLC-refund and WebSocket checks follow issues found by [Mintprobe](https://github.com/mmajjd926-netizen/mintprobe), another Nut November mint tester ([cdk#2980](https://github.com/cashubtc/cdk/issues/2980), [cdk#2983](https://github.com/cashubtc/cdk/pull/2983)).
 - **23 Nov (later):** one grade per mint with a ✓/✗ line each for the free and the paid checks (when, and how they went) instead of the asterisk; mints from MintRadar and cashumints.space, trimmed to the 39 that answer and issue ecash on real Lightning, so every one gets the paid checks; free checks twice a day, paid daily; sweeps test six mints at a time; the scorecard shows the last 7 runs.
 - **23 Nov (evening):** fixes from the first big runs: a fake-Lightning check (ecash only for invoices that were really paid); a mint that can't pay NutCheck back no longer stops funding for the others; slow pay-backs are awaited, not counted as failures; legacy base64 keyset IDs are recognised (one mint was wrongly graded C for them); old `SIG_ALL` and NUT-20 signing formats are retried and shown as warnings. After the next run: one wallet payment failing only skips that mint, and paid runs start with the mints that waited longest. Run #48 was the first where funding never stopped: 30 of 39 mints got paid checks; timeouts now count as "mint busy" instead of crashing, and mints with a minimum mint amount are funded to match.
-- **24 Nov:** no letter grade without paid results (**?** instead, so an A always means both halves passed); a timeout during the paid checks is shown in the paid line, not the free one; mjex and sortug (no Lightning route), nuts.cash (no invoices) and sharegap (invoice requests time out) dropped, leaving 35 mints.
+- **24 Nov:** no letter grade without paid results (**?** instead, so an A always means both halves passed); a timeout during the paid checks is shown in the paid line, not the free one; mjex and sortug (no Lightning route), nuts.cash (no invoices) and sharegap (invoice requests time out) dropped, leaving 35 mints. The clock check re-reads an uncached info page before warning (21mint.me's nginx caches `/v1/info`, so its `time` looked 19–35 minutes off).
 - **Next:** a GitHub Action for operators.
 
 The [design brief](docs/nutcheck-brief.md) has the reasoning, the test catalogue and the ethics.

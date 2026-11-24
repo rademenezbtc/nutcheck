@@ -191,3 +191,35 @@ def test_legacy_alias_is_not_key_reuse():
     w.keysets = {k: Keyset(k, "sat", True, 0, dict(keys)) for k in (v1, "AAAAAAAAAAAA")}
     res = {r.id: r for r in checks_free.run(w.client, w)[0]}
     assert res["keys.keyset_id"].status.value == "fail"
+
+
+def _info_run(stale_by: int, fresh_off: int):
+    """checks_free on a fake mint whose cached /v1/info is `stale_by` s old and whose real clock is `fresh_off` s off."""
+    import time as _t
+    from nutcheck import checks_free
+    from nutcheck.wallet import Keyset, Wallet
+    keys = {1: secp.encode_hex(secp.mul(11, secp.G))}
+    kid = crypto.keyset_id_v1(keys)
+
+    class Client:
+        url, log = "https://mint.example", []
+        def info(self): return {"nuts": {}, "name": "x", "version": "Nutshell/0.21.0", "time": int(_t.time()) - stale_by}
+        def info_fresh(self): return {"nuts": {}, "time": int(_t.time()) + fresh_off}
+        def swap(self, *a): raise checks_free.MintError(400, {"code": 10001, "detail": "invalid proof"})
+
+    w = Wallet(Client())
+    w.load_keysets = lambda: None
+    w.keysets = {kid: Keyset(kid, "sat", True, 0, dict(keys))}
+    return {r.id: r for r in checks_free.run(w.client, w)[0]}["info.wellformed"]
+
+
+def test_cached_info_page_is_not_clock_skew():
+    """21mint.me: nginx caches /v1/info, so its `time` was 19 or 35 minutes old; the clock itself is right."""
+    r = _info_run(stale_by=1126, fresh_off=0)
+    assert r.status.value == "pass", r.summary
+    assert r.evidence["info_cached_s"] >= 1126 and abs(r.evidence["clock_skew_s"]) <= 2
+
+
+def test_real_clock_skew_still_warns():
+    r = _info_run(stale_by=1126, fresh_off=-1126)
+    assert r.status.value == "warn" and "clock is off" in r.summary

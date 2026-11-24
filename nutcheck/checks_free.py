@@ -53,9 +53,17 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
                 secp.decode(info["pubkey"])
             except secp.InvalidPoint:
                 problems.append("`pubkey` is not a valid secp256k1 point")
-        skew = None
+        skew, cached_for = None, None
         if isinstance(info.get("time"), int):
             skew = info["time"] - int(time.time())
+            if abs(skew) > 120:
+                # A cached info page (nginx, a CDN) carries the time it was cached, not the mint's clock.
+                try:
+                    fresh = client.info_fresh().get("time")
+                except (MintError, Inconclusive, ValueError, AttributeError):
+                    fresh = None
+                if isinstance(fresh, int):
+                    cached_for, skew = -skew if skew < 0 else None, fresh - int(time.time())
             if abs(skew) > 120:
                 problems.append(f"mint clock is off by {skew}s (affects P2PK/HTLC locktimes)")
         out.append(Result(
@@ -63,6 +71,7 @@ def run(client: MintClient, wallet: Wallet) -> tuple[list[Result], dict]:
             St.WARN if problems else St.PASS,
             "; ".join(problems) or f"{info.get('name')!r} running {info.get('version')}",
             evidence={"name": info.get("name"), "version": info.get("version"), "clock_skew_s": skew,
+                      **({"info_cached_s": cached_for} if cached_for else {}),
                       "nuts": sorted(info.get("nuts", {}), key=lambda x: int(x) if x.isdigit() else 999)},
         ))
     except Inconclusive:
