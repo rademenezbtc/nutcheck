@@ -48,6 +48,7 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, pr
     results: list[Result] = []
     info: dict = {}
     on_invoice = on_invoice or (lambda inv, amt: None)
+    paid_phase = False  # a timeout during the paid checks belongs to the paid half, not the free one
     try:
         free, info = checks_free.run(client, wallet)
         results += free
@@ -56,15 +57,18 @@ def audit(url: str, *, free_only=False, fund=64, wait=600.0, on_invoice=None, pr
         if preload and wallet.keysets:
             wallet.proofs += preload  # change kept from an earlier run; paid back with this run's leftovers
         if not free_only and wallet.keysets:
+            paid_phase = True
             results += checks_funded.run(client, wallet, info, fund, wait, on_invoice, expect_payment)
     except Inconclusive as e:
         results.append(Result(
             "nutcheck.inconclusive", "Mint answered every request", "-", Severity.INFO, Status.ERROR,
             f"Run incomplete: {e}. The remaining checks were not run. This is not a mark against the mint; "
-            "it usually means the mint was busy or limits how fast one client may send requests."))
+            "it usually means the mint was busy or limits how fast one client may send requests.",
+            funded=paid_phase))
     except Exception as e:  # noqa: BLE001
         results.append(Result("nutcheck.crash", "NutCheck completed", "-", Severity.INFO, Status.ERROR,
-                              f"{type(e).__name__}: {e}", evidence={"trace": traceback.format_exc()[-2000:]}))
+                              f"{type(e).__name__}: {e}", evidence={"trace": traceback.format_exc()[-2000:]},
+                              funded=paid_phase))
     g = grade(results)
     issued = any(r.id == "mint.issue" for r in results)  # ecash was actually minted from a paid quote
     preloaded = sum(p.amount for p in (preload or []))

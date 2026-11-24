@@ -110,6 +110,8 @@ def rating_for(report: dict) -> int:
 def publishable(v) -> bool:
     """Skip mints that didn't answer or whose run broke off: the last review stays until a real result."""
     L = v.latest
+    if v.grade == "?":
+        return False  # not graded until the paid checks have run
     return L.get("reachable", True) and not any(r["id"] == "nutcheck.inconclusive" for r in L["results"])
 
 

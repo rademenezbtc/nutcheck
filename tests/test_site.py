@@ -174,7 +174,7 @@ def test_free_run_keeps_latest_funded_results(tmp_path):
 def test_funded_results_not_carried_across_upgrade(tmp_path):
     upgraded = lambda s, u, w: _free_only(s, u, w, version="Nutshell/0.22.0")
     feed, _ = _feed(tmp_path, [_funded_b, upgraded])
-    assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None
+    assert feed["grade"] is None and not feed["graded"] and feed["funded_tested"] is None  # no paid results: "?"
 
 
 def test_failed_funding_attempt_stops_carry(tmp_path):
@@ -183,7 +183,7 @@ def test_failed_funding_attempt_stops_carry(tmp_path):
         r["results"][-1].update(status="error", summary="Run incomplete: the mint could not create a Lightning invoice")
         return r
     feed, out = _feed(tmp_path, [_funded_b, no_invoice, _free_only])
-    assert feed["grade"] == "A" and feed["partial"] and feed["funded_tested"] is None
+    assert feed["grade"] is None and not feed["graded"] and feed["funded_tested"] is None  # no paid results: "?"
     assert "Incomplete: the mint could not create a Lightning invoice" in (out / "index.html").read_text()
 
 
@@ -209,7 +209,7 @@ def test_paid_line_says_why_paid_checks_did_not_run(tmp_path):
     feed, out = _feed(tmp_path, [_free_only])
     page = (out / "mints" / "127.0.0.1_3399.html").read_text()
     assert 'aria-label="not run">' in page and "<span>Paid checks · not run: free checks only for this mint</span>" in page
-    assert ">A<" in page and "A*" not in page
+    assert 'aria-label="Grade ?"' in page and "Not graded yet" in page and ">A<" not in page
 
 
 def test_scorecard_shows_the_last_seven_runs(tmp_path):
@@ -230,3 +230,29 @@ def test_low_failures_get_the_amber_mark_and_say_low():
     html = v.lines_html()
     assert 'aria-label="warning">' in html and 'aria-label="failed">' not in html
     assert "Paid checks · not run yet" in html  # never funded so far
+
+
+def test_free_failures_still_grade_without_paid_results(tmp_path):
+    """No paid results hides an A (it says too little), never a failure the free checks found."""
+    from nutcheck.site import MintView
+    r = _report("m", "https://m.example", T0)
+    r["results"] = [x for x in r["results"] if not x.get("funded")]
+    r["results"].append({"id": "keys.unique", "title": "Keys", "nut": "02", "severity": "high", "status": "fail",
+                         "summary": "reused", "funded": False, "evidence": {}, "category": "Keys"})
+    r["partial"], r["grade"] = True, "C"
+    assert MintView({"url": "https://m.example"}, "m", [r], r).grade == "C"
+    r["results"].pop(); r["grade"] = "A"
+    assert MintView({"url": "https://m.example"}, "m", [r], r).grade == "?"
+
+
+def test_timeout_in_the_paid_half_is_not_a_free_problem():
+    from nutcheck.site import MintView
+    r = _report("m", "https://m.example", T0)
+    r["results"] = [x for x in r["results"] if not x.get("funded")]
+    r["results"].append({"id": "nutcheck.inconclusive", "title": "Mint answered every request", "nut": "-",
+                         "severity": "info", "status": "error", "funded": True, "evidence": {}, "category": "Info",
+                         "summary": "Run incomplete: POST /v1/mint/quote/bolt11: no answer in time. The rest..."})
+    r["partial"], r["grade"] = True, "A"
+    v = MintView({"url": "https://m.example", "funded": "nwc"}, "m", [r], r)
+    assert v.free_line[1] == "passed"
+    assert v.paid_line[1] == "not run: the mint didn't answer in time" and v.grade == "?"

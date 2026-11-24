@@ -31,6 +31,7 @@ GRADE_STYLE = {
     "D": ("#A85E00", "#FFFFFF", "#FBEBD0", "#8A4F00", "#D39A3A"),
     "F": ("#B8321A", "#FFFFFF", "#F9DDD6", "#A32A12", "#D2553B"),
     "—": ("#E2E2DC", "#2A2D35", "#ECECE7", "#4A4F5B", "#D9D9D3"),
+    "?": ("#E2E2DC", "#2A2D35", "#ECECE7", "#4A4F5B", "#D9D9D3"),
 }
 SEVERE = {"critical", "high"}
 FAIL_PHRASE = {
@@ -174,12 +175,20 @@ class MintView:
         When and how each half ran is shown next to it (free_line, paid_line), not folded into the grade."""
         if not self.latest.get("reachable", True):
             return "—"
-        return self.latest["grade"]
+        g = self.latest["grade"]
+        if not self.has_paid and g[0] == "A":
+            return "?"  # the free checks alone rarely fail: no letter until the paid half has run
+        return g  # a free-check failure is known either way, so it shows even without paid results
+
+    @property
+    def has_paid(self) -> bool:
+        """Paid results in the latest report, its own or carried from a paid run in the last 8 days."""
+        return any(r.get("funded") and r["status"] in ("pass", "fail", "warn") for r in self.latest["results"])
 
     @property
     def band(self) -> str:
         g = self.grade
-        if g == "—":
+        if g in ("—", "?"):
             return "off"
         return {"A": "a", "B": "bc", "C": "bc", "D": "bc", "F": "f"}[g[0]]
 
@@ -233,8 +242,9 @@ class MintView:
     def paid_reason(self) -> str:
         """Why there are no paid results to show, in a few words."""
         L = self.latest
-        if any(r["id"] == "nutcheck.inconclusive" for r in L["results"]):
-            return "mint returned errors"
+        inc = [r for r in L["results"] if r["id"] == "nutcheck.inconclusive"]
+        if inc:
+            return "the mint didn't answer in time" if "no answer in time" in inc[0]["summary"] else "mint returned errors"
         if not self.cfg.get("funded"):
             return "free checks only for this mint"
         if any(r["id"] == "mint.funded" and "waiting to be paid back" in r["summary"] for r in L["results"]):
@@ -369,7 +379,7 @@ def build_views(cfg: dict, base: Path, now: datetime, embargo_days: int) -> list
                            else "p" if "pass" in sts else "s")
         views.append(v)
     order = {"a": 0, "bc": 1, "f": 2, "off": 3}
-    grade_rank = ["A+", "A", "A-", "A*", "A-*", "B", "B*", "C", "C*", "D", "F", "F*", "—"]
+    grade_rank = ["A+", "A", "A-", "B", "C", "D", "F", "?", "—"]
     views.sort(key=lambda v: (order[v.band], grade_rank.index(v.grade) if v.grade in grade_rank else 99, v.name.lower()))
     return views
 
@@ -706,7 +716,7 @@ def render_index(views: list[MintView], cfg: dict) -> str:
 <span>An A means the mint followed the protocol in our last test. It says nothing about whether the mint holds the bitcoin behind its ecash. For uptime and payout history, see the Cashu round-robin auditor.</span></div>
 <section class="card" aria-label="Mints" style="overflow:hidden">
 <div class="toolbar"><div role="group" aria-label="Filter by grade" style="display:flex;flex-wrap:wrap;gap:6px">{pill_html}</div>
-<span class="small muted" style="margin-left:auto">— unreachable</span></div>
+<span class="small muted" style="margin-left:auto">? not graded yet (no paid results) · — unreachable</span></div>
 <div class="scroll"><table class="mints"><thead>{group_row}<tr><th scope="col">Grade</th><th scope="col">Mint</th>{heads}
 <th scope="col">Last {INDEX_RUNS} runs</th><th scope="col">Tested</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
 <div class="legend"><b style="color:#15171C">How grades work</b><span>The worst failure caps the grade:</span>
@@ -816,6 +826,10 @@ def render_mint(v: MintView, cfg: dict) -> str:
     if g == "—":
         why = ('<section class="why" style="background:#ECECE7"><h2>Unreachable</h2>'
                f'<p>The mint did not answer in the last run ({escape(fmt_time(L["started"]))}).</p></section>')
+    elif g == "?":
+        why = ('<section class="why" style="background:#ECECE7"><h2>Not graded yet</h2>'
+               '<p>NutCheck grades a mint once its paid checks have run, because the free checks alone rarely fail. '
+               f'Paid checks: {escape(v.paid_line[1])}. The free checks are listed below.</p></section>')
     elif v.withheld:
         why = (f'<section class="why" style="background:#F4F4F1;border:1px dashed #C9C9C2"><h2>Details withheld until {fmt_day(v.publish_on)}</h2>'
                f'<p>NutCheck saw a serious failure on {fmt_day(v.first_seen)} and {"reported it to the operator" if v.cfg.get("notified") else "is contacting the operator"}. '
@@ -919,7 +933,7 @@ def render_badge(v: MintView) -> str:
     if v.withheld:
         right, bg, fg = "under review", "#E2E2DC", "#2A2D35"
     else:
-        right = v.grade if v.grade != "—" else "offline"
+        right = {"—": "offline", "?": "not graded"}.get(v.grade, v.grade)
         bg, fg = GRADE_STYLE[base_grade(v.grade)][:2]
     lw, rw = 70, max(30, 8 + 7 * len(right))
     w = lw + rw
@@ -940,7 +954,7 @@ def redacted(report: dict) -> dict:
 def feed(views: list[MintView], base_url: str) -> dict:
     out = []
     for v in views:
-        e = {"url": v.url, "name": v.name, "grade": v.latest["grade"] if v.latest.get("reachable", True) else None, "partial": v.latest.get("partial", False),
+        e = {"url": v.url, "name": v.name, "grade": v.grade if v.grade not in ("—", "?") else None, "graded": v.grade not in ("—", "?"), "partial": v.latest.get("partial", False),
              "reachable": v.latest.get("reachable", True), "tested": v.latest["started"], "funded_tested": v.latest.get("funded_from") or (v.latest["started"] if _has_funded(v.latest) else None), "withheld": v.withheld,
              "page": f"{base_url}mints/{v.slug}.html", "badge": f"{base_url}badge/{v.slug}.svg"}
         if v.withheld:

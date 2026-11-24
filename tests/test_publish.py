@@ -71,3 +71,11 @@ def test_only_changed_reviews_are_resent(tmp_path):
         day_later = [publish.profile(cfg, KEY, t + 86400)]
         assert publish.sync_relay(url, day_later, pub)["sent"] == 1
     assert sum(e["kind"] == 38000 for e in relay.events) == 2
+
+
+def test_no_review_until_the_paid_checks_have_run():
+    from nutcheck.publish import publishable
+    class V:  # a reachable, complete run with no paid results
+        grade = "?"
+        latest = {"reachable": True, "results": []}
+    assert not publishable(V())
