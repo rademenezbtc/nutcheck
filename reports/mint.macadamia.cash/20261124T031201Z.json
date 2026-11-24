@@ -1,0 +1,195 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.macadamia.cash",
+  "slug": "mint.macadamia.cash",
+  "started": "2026-11-24T03:12:01+00:00",
+  "duration_s": 11.2,
+  "reachable": true,
+  "grade": "A-",
+  "partial": true,
+  "reasons": [
+    "WebSocket subscriptions work (low) \u2192 capped at A-"
+  ],
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "warn": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "errors": [],
+  "spent_sat": 0,
+  "requests": 7,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "macadamia Mint",
+    "pubkey": "030b8f63e87420144ccd1e1d76628f8bd5c86e3e5aa6b185445689ee2d746157bb",
+    "version": "cdk-mintd/0.18.1",
+    "description": "This is the default mint for macadamia Wallet.",
+    "contact": [
+      {
+        "method": "email",
+        "info": "contact@macadamia.cash"
+      }
+    ],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "01a13e301f954f716ebdcbe9750b19d9df7e8ce3e883ebcde169fcacd473fc307a",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 150
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'macadamia Mint' running cdk-mintd/0.18.1",
+      "funded": false,
+      "evidence": {
+        "name": "macadamia Mint",
+        "version": "cdk-mintd/0.18.1",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "32 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 01a13e301f95\u2026 fee 150 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "fail",
+      "summary": "Subscription accepted, but the mint never sent the current state. NUT-17 says it MUST notify the current state first (UNSPENT for a never-seen proof); wallets waiting for it hang until they fall back to polling.",
+      "funded": false,
+      "evidence": {
+        "url": "wss://mint.macadamia.cash/v1/ws",
+        "messages": [
+          {
+            "id": 0,
+            "jsonrpc": "2.0",
+            "result": {
+              "status": "OK",
+              "subId": "03de1da8-8795-438d-b60b-818283a4494d"
+            }
+          }
+        ]
+      },
+      "category": "Info"
+    }
+  ]
+}

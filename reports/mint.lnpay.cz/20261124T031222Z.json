@@ -1,0 +1,194 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.lnpay.cz",
+  "slug": "mint.lnpay.cz",
+  "started": "2026-11-24T03:12:22+00:00",
+  "duration_s": 2.7,
+  "reachable": true,
+  "grade": "A-",
+  "partial": true,
+  "reasons": [
+    "WebSocket subscriptions work (low) \u2192 capped at A-"
+  ],
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "warn": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "errors": [],
+  "spent_sat": 0,
+  "requests": 7,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "LNpay Mint",
+    "pubkey": "025a3b7fc5e68323465697f5eaadb5961ca4e10785fed9d82ae2389853d1f5a44b",
+    "version": "Nutshell/0.22.0",
+    "description": "This mint is for demonstration purposes only",
+    "contact": [
+      {
+        "method": "email",
+        "info": "me@lnpay.cz"
+      },
+      {
+        "method": "twitter",
+        "info": "@iwarpbtc"
+      },
+      {
+        "method": "nostr",
+        "info": "npub1mekx82usw7036zh2l8keha7n5aumansa8j5hugt33vf6e5pg8zds086lkn"
+      }
+    ],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "01dd20cd4bb01e5b387c1069527f3dddc309f30ad959f49977fd55a21bc0164e0b",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 200
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'LNpay Mint' running Nutshell/0.22.0",
+      "funded": false,
+      "evidence": {
+        "name": "LNpay Mint",
+        "version": "Nutshell/0.22.0",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "64 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 01dd20cd4bb0\u2026 fee 200 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "fail",
+      "summary": "Info page advertises NUT-17, but the WebSocket answers HTTP 404",
+      "funded": false,
+      "evidence": {
+        "url": "wss://mint.lnpay.cz/v1/ws",
+        "http_status": 404
+      },
+      "category": "Info"
+    }
+  ]
+}
