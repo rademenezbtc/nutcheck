@@ -153,10 +153,10 @@
     {
       "check": "p2pk.malformed",
       "software": "cdk-mintd",
-      "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. Fixed on CDK main on 16 Nov 2026 (#2888) and being backported for CDK 0.18.4 (#2995); mints pass once they upgrade to a release that includes it.",
+      "text": "CDK keeps the first copy of a duplicated spending-condition tag instead of rejecting the proof as NUT-11 requires. Fixed on CDK main on 16 Nov 2026 (#2888) and backported to CDK's 0.18 branch on 24 Nov (#2995); mints pass once they upgrade to CDK 0.18.4 or later.",
       "url": "https://github.com/cashubtc/cdk/pull/2995",
       "link_text": "CDK backport #2995",
-      "label": "fix coming in CDK 0.18.4: upgrade when released"
+      "label": "fixed for CDK 0.18.4: upgrade when released"
     },
     {
       "check": "p2pk.malformed",
@@ -170,10 +170,10 @@
     {
       "check": "htlc.refund",
       "software": "cdk-mintd",
-      "text": "CDK 0.18.x reads a witness without a preimage as a P2PK witness, so it refuses the HTLC refund path (the refund key's signature alone, after the locktime). Fixed on CDK main in #2641 and backported to 0.18 in #2985, so it ships in the next 0.18 release. Found by Mintprobe (cdk#2980).",
+      "text": "CDK 0.18.x reads a witness without a preimage as a P2PK witness, so it refuses the HTLC refund path (the refund key's signature alone, after the locktime). Fixed on CDK main in #2641 and backported to CDK's 0.18 branch on 23–24 Nov (#2985, #2996); mints pass once they upgrade to CDK 0.18.4 or later. Found by Mintprobe (cdk#2980).",
       "url": "https://github.com/cashubtc/cdk/pull/2985",
       "link_text": "CDK backport #2985",
-      "label": "fix coming in CDK 0.18.4: upgrade when released"
+      "label": "fixed for CDK 0.18.4: upgrade when released"
     },
     {
       "check": "ws.subscribe",
