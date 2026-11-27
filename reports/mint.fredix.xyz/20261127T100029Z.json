@@ -1,0 +1,210 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.fredix.xyz",
+  "slug": "mint.fredix.xyz",
+  "started": "2026-11-27T10:00:29+00:00",
+  "duration_s": 12.7,
+  "reachable": true,
+  "grade": "A-",
+  "partial": true,
+  "reasons": [
+    "WebSocket subscriptions work (low) \u2192 capped at A-"
+  ],
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "warn": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "errors": [],
+  "spent_sat": 0,
+  "requests": 7,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": "Mint fredix",
+    "pubkey": "02283f91bb5e9e928a5c4a04ae9af76c9887ca6756b083458623238a648f57eb90",
+    "version": "cdk-mintd/0.18.3",
+    "description": "a self-hosted Mint server",
+    "contact": [
+      {
+        "method": "nostr",
+        "info": "npub1vwldp9k95xxe9mgnzakykpmhmazj5q2veldt6jvju2dvrfkxvlaq6dzfhz"
+      },
+      {
+        "method": "email",
+        "info": "fredix@nomad.wf"
+      }
+    ],
+    "nuts": [
+      "4",
+      "5",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "14",
+      "15",
+      "17",
+      "19",
+      "20",
+      "29"
+    ],
+    "keysets": [
+      {
+        "id": "00d2385b53d73526",
+        "unit": "sat",
+        "active": true,
+        "input_fee_ppk": 0
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "transport.https",
+      "title": "Mint is served over HTTPS",
+      "nut": "-",
+      "severity": "medium",
+      "status": "pass",
+      "summary": "HTTPS in use",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "info.wellformed",
+      "title": "Info endpoint is well formed",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "'Mint fredix' running cdk-mintd/0.18.3",
+      "funded": false,
+      "evidence": {
+        "name": "Mint fredix",
+        "version": "cdk-mintd/0.18.3",
+        "clock_skew_s": 0,
+        "nuts": [
+          "4",
+          "5",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "14",
+          "15",
+          "17",
+          "19",
+          "20",
+          "29"
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "keys.valid_points",
+      "title": "All public keys are valid curve points",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "32 keys across 1 keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.unique",
+      "title": "Every amount has its own key",
+      "nut": "01",
+      "severity": "high",
+      "status": "pass",
+      "summary": "No key is reused across amounts or keysets",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "keys.keyset_id",
+      "title": "Keyset IDs match their keys",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "1 keyset ID(s) re-derived and matched",
+      "funded": false,
+      "evidence": {
+        "mismatches": []
+      },
+      "category": "Keys"
+    },
+    {
+      "id": "keys.active",
+      "title": "At least one active keyset",
+      "nut": "02",
+      "severity": "high",
+      "status": "pass",
+      "summary": "sat: 00d2385b53d7\u2026 fee 0 ppk",
+      "funded": false,
+      "evidence": {},
+      "category": "Keys"
+    },
+    {
+      "id": "swap.rejects_forgery",
+      "title": "Rejects forged ecash",
+      "nut": "03",
+      "severity": "critical",
+      "status": "pass",
+      "summary": "Forged proof refused (10001)",
+      "funded": false,
+      "evidence": {},
+      "category": "Forgery"
+    },
+    {
+      "id": "info.claims_answer",
+      "title": "Claimed NUT endpoints respond",
+      "nut": "06",
+      "severity": "low",
+      "status": "pass",
+      "summary": "Every probed claim answered",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    },
+    {
+      "id": "ws.subscribe",
+      "title": "WebSocket subscriptions work",
+      "nut": "17",
+      "severity": "low",
+      "status": "fail",
+      "summary": "Subscription accepted, but the mint never sent the current state. NUT-17 says it MUST notify the current state first (UNSPENT for a never-seen proof); wallets waiting for it hang until they fall back to polling.",
+      "funded": false,
+      "evidence": {
+        "url": "wss://mint.fredix.xyz/v1/ws",
+        "messages": [
+          {
+            "id": 0,
+            "jsonrpc": "2.0",
+            "result": {
+              "status": "OK",
+              "subId": "5de9cf76-29a9-4e60-8b61-32644b516236"
+            }
+          }
+        ]
+      },
+      "category": "Info"
+    },
+    {
+      "id": "mint.funded",
+      "title": "Funding invoice paid",
+      "nut": "04",
+      "severity": "info",
+      "status": "skip",
+      "summary": "Not funded: funding stopped earlier in this run (wallet could not pay a funding invoice: no NWC relay reachable (TimeoutError: timed out in 59.9s))",
+      "funded": true,
+      "evidence": {},
+      "category": "Issuing"
+    }
+  ]
+}

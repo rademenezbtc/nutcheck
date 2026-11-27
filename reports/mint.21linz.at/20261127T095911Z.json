@@ -1,0 +1,57 @@
+{
+  "nutcheck": "0.1.0",
+  "mint": "https://mint.21linz.at",
+  "slug": "mint.21linz.at",
+  "started": "2026-11-27T09:59:11+00:00",
+  "duration_s": 17.5,
+  "reachable": true,
+  "grade": "A",
+  "partial": true,
+  "reasons": [],
+  "counts": {
+    "pass": 0,
+    "fail": 0,
+    "warn": 0,
+    "skip": 0,
+    "error": 1
+  },
+  "errors": [
+    "nutcheck.inconclusive"
+  ],
+  "spent_sat": 0,
+  "requests": 1,
+  "rate_limited": 0,
+  "mint_info": {
+    "name": null,
+    "pubkey": null,
+    "version": null,
+    "description": null,
+    "contact": null,
+    "nuts": [],
+    "keysets": []
+  },
+  "results": [
+    {
+      "id": "nutcheck.inconclusive",
+      "title": "Mint answered every request",
+      "nut": "-",
+      "severity": "info",
+      "status": "error",
+      "summary": "Run incomplete: GET /v1/info: HTTP 502. The remaining checks were not run. This is not a mark against the mint; it usually means the mint was busy or limits how fast one client may send requests.",
+      "funded": false,
+      "evidence": {},
+      "category": "Info"
+    }
+  ],
+  "funding": {
+    "source": "nwc",
+    "paid_in": 0,
+    "funded": false,
+    "carried_in": 0,
+    "leftover": 0,
+    "returned": 0,
+    "melt_fee": 0,
+    "dust": 0,
+    "ok": true
+  }
+}
