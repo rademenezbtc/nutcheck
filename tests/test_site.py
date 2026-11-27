@@ -275,3 +275,25 @@ def test_demo_files_get_versioned_urls(tmp_path):
     assert v1 and v2 and v1 != v2
     page = (out / "demo" / "index.html").read_text()
     assert f'poster="poster.jpg?v={v2}"' in page and "nutcheck-demo.mp4?v=" in page
+
+
+def test_wallet_outage_keeps_the_last_paid_results(tmp_path):
+    """NutCheck's wallet failing (NWC relay down) is not the mint's fault: yesterday's paid results still count."""
+    url = "http://127.0.0.1:3399"; slug = "127.0.0.1_3399"
+    d = tmp_path / "reports" / slug; d.mkdir(parents=True)
+    paid = _report(slug, url, T0, [("p2pk.malformed", "medium")]); paid["grade"] = "B"
+    paid["funding"] = {"source": "nwc", "paid_in": 64, "funded": True}
+    (d / "0.json").write_text(json.dumps(paid))
+    for i, why in enumerate(["Could not fund this run (no NWC relay reachable (TimeoutError: timed out in 60.0s)); "
+                             "funded checks skipped",
+                             "Not funded: funding stopped earlier in this run (wallet could not pay a funding invoice)"]):
+        r = _report(slug, url, T0 + timedelta(hours=12 * (i + 1)))
+        r["funding"] = {"source": "nwc", "paid_in": 0, "funded": False}
+        r["results"].append({"id": "mint.funded", "title": "Funding invoice paid", "nut": "04", "severity": "info",
+                             "status": "skip", "summary": why, "funded": True, "evidence": {}, "category": "Issuing"})
+        (d / f"{i + 1}.json").write_text(json.dumps(r))
+        (tmp_path / "scorecard.json").write_text(json.dumps({"mints": [{"url": url}], "embargo_days": 14}))
+        out = _build(tmp_path, T0 + timedelta(days=1))
+        feed = json.loads((out / "api" / "mints.json").read_text())["mints"][0]
+        assert feed["grade"] == "B" and feed["failed"] == ["p2pk.malformed"], (why, feed)
+        import shutil; shutil.rmtree(out)

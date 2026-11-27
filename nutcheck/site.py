@@ -318,7 +318,20 @@ def _has_funded(report: dict) -> bool:
     return any(r.get("funded") and r["status"] in ("pass", "fail", "warn") for r in report["results"])
 
 
+# mint.funded skips that come from NutCheck's own wallet (NWC relay down, funding stopped earlier in the run,
+# no route from the wallet, per-run cap): not the mint's doing, so they don't count as an attempt at the paid checks
+WALLET_SIDE = ("Could not fund this run", "Not funded: funding stopped earlier")
+
+
+def _wallet_failed(report: dict) -> bool:
+    funded = [r for r in report["results"] if r.get("funded")]
+    return bool(funded) and all(r["id"] == "mint.funded" and r["status"] == "skip"
+                                and r["summary"].startswith(WALLET_SIDE) for r in funded)
+
+
 def _tried_funded(report: dict) -> bool:
+    if _wallet_failed(report):
+        return False
     return bool(report.get("funding")) or any(r.get("funded") and r["status"] != "skip" for r in report["results"])
 
 
