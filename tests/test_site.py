@@ -256,3 +256,22 @@ def test_timeout_in_the_paid_half_is_not_a_free_problem():
     v = MintView({"url": "https://m.example", "funded": "nwc"}, "m", [r], r)
     assert v.free_line[1] == "passed"
     assert v.paid_line[1] == "not run: the mint didn't answer in time" and v.grade == "?"
+
+
+def test_demo_files_get_versioned_urls(tmp_path):
+    """A new poster or video gets a new URL, so link previews and browsers don't keep showing the old one."""
+    _setup(tmp_path)
+    demo = tmp_path / "assets" / "demo"
+    demo.mkdir(parents=True)
+    (demo / "nutcheck-demo.mp4").write_bytes(b"video-1")
+    (demo / "poster.jpg").write_bytes(b"poster-1")
+    first = (_build(tmp_path, T0 + timedelta(days=7)) / "index.html").read_text()
+    assert 'demo/poster.jpg?v=' in first
+    (demo / "poster.jpg").write_bytes(b"poster-2")
+    import shutil; shutil.rmtree(tmp_path / "site")
+    out = _build(tmp_path, T0 + timedelta(days=7))
+    second = (out / "index.html").read_text()
+    v1 = first.split("poster.jpg?v=")[1][:10]; v2 = second.split("poster.jpg?v=")[1][:10]
+    assert v1 and v2 and v1 != v2
+    page = (out / "demo" / "index.html").read_text()
+    assert f'poster="poster.jpg?v={v2}"' in page and "nutcheck-demo.mp4?v=" in page

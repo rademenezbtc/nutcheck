@@ -11,6 +11,7 @@ Disclosure: a critical or high failure is shown as a grade only, with details wi
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -604,7 +605,7 @@ def page(title: str, body: str, root: str, cfg: dict, current: str = "scorecard"
 <link rel="alternate" type="application/json" href="{root}api/mints.json">
 <meta property="og:title" content="{escape(title)}"><meta property="og:site_name" content="NutCheck">
 <meta property="og:description" content="Independent protocol tests for Cashu mints, graded A to F with the evidence.">
-<meta property="og:image" content="{escape(cfg.get('base_url', root))}{'demo/poster.jpg' if cfg.get('_demo') else 'logo.png'}">
+<meta property="og:image" content="{escape(cfg.get('base_url', root))}{'demo/poster.jpg?v=' + cfg.get('_poster_v', '') if cfg.get('_demo') else 'logo.png'}">
 <meta name="twitter:card" content="{'summary_large_image' if cfg.get('_demo') else 'summary'}"></head>
 <body><header class="top"><div class="wrap">
 <a class="brand disp" href="{root}index.html">{LOGO}<span>{escape(cfg.get('title', 'NutCheck'))}</span></a>
@@ -1000,8 +1001,8 @@ def render_demo(cfg: dict) -> str:
     body = f"""<main style="display:block;padding-top:28px;max-width:1080px;margin:0 auto">
 <h1 style="margin:0 0 8px">NutCheck in one minute</h1>
 <p class="muted" style="margin:0 0 20px">The scorecard, a mint that passes, a mint that fails, and proof that NutCheck spots a mint that breaks the protocol.</p>
-<video controls playsinline preload="metadata" poster="poster.jpg" style="width:100%;border-radius:14px;background:#000;display:block">
-<source src="nutcheck-demo.mp4" type="video/mp4"></video>
+<video controls playsinline preload="metadata" poster="poster.jpg?v={cfg.get('_poster_v', '')}" style="width:100%;border-radius:14px;background:#000;display:block">
+<source src="nutcheck-demo.mp4?v={cfg.get('_video_v', '')}" type="video/mp4"></video>
 <p style="margin-top:18px"><a href="../index.html">See the live scorecard</a> · <a href="{escape(repo)}">Source on GitHub</a> · <a href="nutcheck-demo.mp4" download>Download the video</a></p>
 </main>"""
     return page("NutCheck in one minute", body, "../", cfg, "demo")
@@ -1040,9 +1041,11 @@ def cmd_site(argv) -> int:
     if (demo / "nutcheck-demo.mp4").exists():
         cfg["_demo"] = True
         (out / "demo").mkdir()
-        for f in ("nutcheck-demo.mp4", "poster.jpg"):
+        for f, key in (("nutcheck-demo.mp4", "_video_v"), ("poster.jpg", "_poster_v")):
             if (demo / f).exists():
                 shutil.copyfile(demo / f, out / "demo" / f)
+                # a new file gets a new URL, so link previews and browsers don't keep the old one
+                cfg[key] = hashlib.sha256((demo / f).read_bytes()).hexdigest()[:10]
         (out / "demo" / "index.html").write_text(render_demo(cfg))
     (out / "index.html").write_text(render_index(views, cfg))
     for v in views:
